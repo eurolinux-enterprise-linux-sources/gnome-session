@@ -4,14 +4,13 @@
 %define gnome_keyring_version 2.21.92
 %define gconf2_version 2.14.0
 %define libnotify_version 0.2.1
-%define _default_patch_fuzz 999
 
 %define po_package gnome-session-2.0
 
 Summary: GNOME session manager
 Name: gnome-session
 Version: 2.28.0
-Release: 15%{?dist}
+Release: 18%{?dist}
 URL: http://www.gnome.org
 Source0: http://download.gnome.org/sources/gnome-session/2.28/%{name}-%{version}.tar.bz2
 # latest upstream translations
@@ -86,15 +85,14 @@ Patch3: 0001-Add-ability-to-perform-actions-after-a-period-of-idl.patch
 # https://bugzilla.gnome.org/show_bug.cgi?id=607094
 Patch4: nag-root-user.patch
 
+# https://bugzilla.gnome.org/show_bug.cgi?id=575544
 # https://bugzilla.gnome.org/show_bug.cgi?id=613270
-Patch5: add-custom-session-selector.patch
+# https://bugzilla.redhat.com/622849
+Patch5: custom-sessions.patch
 
 # translation updates
 # https://bugzilla.redhat.com/show_bug.cgi?id=553594
-Patch6: gnome-session-translations.patch
-
-# https://bugzilla.gnome.org/show_bug.cgi?id=575544
-Patch7: add-save-back.patch
+Patch7: gnome-session-translations.patch
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=589184
 Patch8: fix-up-man-page.patch
@@ -130,7 +128,7 @@ lets the user manage multiple saved sessions.
 %patch2 -p1 -b .xsmp-stop
 %patch3 -p1 -b .max-idle
 %patch4 -p1 -b .nag-root-user
-%patch5 -p1 -b .add-custom-session-selector
+%patch5 -p1 -b .custom-sessions
 
 echo "ACLOCAL_AMFLAGS = -I m4" >> Makefile.am
 
@@ -138,8 +136,7 @@ autoreconf -i -f
 
 cp %{SOURCE3} po
 
-%patch6 -p1 -b .translations
-%patch7 -p1 -b .add-save-back
+%patch7 -p1 -b .translations
 %patch8 -p1 -b .fix-up-man-page
 %patch9 -p1 -b .drop-no-description
 
@@ -235,6 +232,18 @@ fi
 %{_sysconfdir}/xdg/autostart/gnome-settings-daemon-helper.desktop
 
 %changelog
+* Tue Aug 09 2011 Ray Strode <rstrode@redhat.com> 2.28.0-18
+- More symlink handling fixes
+  Related: #622849
+
+* Tue Aug 02 2011 Ray Strode <rstrode@redhat.com> 2.28.0-17
+- Rework handling of symlinks in session saving code
+  Resolves: #664516
+
+* Mon Jul 25 2011 Ray Strode <rstrode@redhat.com> 2.28.0-16
+- Allow session selector to be launched from session properties
+  Resolves: #622849
+
 * Mon Aug 02 2010 Ray Strode <rstrode@redhat.com> 2.28.0-15
 - Relicense session selector patch
   Related: #576291

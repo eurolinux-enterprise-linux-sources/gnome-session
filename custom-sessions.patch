@@ -1,0 +1,2505 @@
+From 3939ceda0e9f7b65d1fd0efc41a86f38ab0023bd Mon Sep 17 00:00:00 2001
+From: Josselin Mouette <joss@malsain.org>
+Date: Mon, 21 Jun 2010 15:22:23 -0400
+Subject: [PATCH 1/7] Add "Remember Currently Running Applications" button
+
+This adds back session saving that's not at logout.
+---
+ capplet/gsm-properties-dialog.c            |   63 ++++++++++++-
+ configure.in                               |    1 +
+ data/session-properties.ui                 |   12 ++
+ gnome-session/gsm-client.c                 |   10 ++
+ gnome-session/gsm-client.h                 |    6 +
+ gnome-session/gsm-dbus-client.c            |   14 +++
+ gnome-session/gsm-manager.c                |  150 +++++++++++++++++++++++++++-
+ gnome-session/gsm-manager.h                |    3 +
+ gnome-session/gsm-xsmp-client.c            |   37 +++++++
+ gnome-session/gsm-xsmp-client.h            |    3 +-
+ gnome-session/org.gnome.SessionManager.xml |    8 ++
+ 11 files changed, 303 insertions(+), 4 deletions(-)
+
+diff --git a/capplet/gsm-properties-dialog.c b/capplet/gsm-properties-dialog.c
+index 84ef910..f54656e 100644
+--- a/capplet/gsm-properties-dialog.c
++++ b/capplet/gsm-properties-dialog.c
+@@ -35,6 +35,12 @@
+ #include "gsm-util.h"
+ #include "gsp-app.h"
+ #include "gsp-app-manager.h"
++#include <dbus/dbus-glib.h>
++#include <dbus/dbus-glib-lowlevel.h>
++
++#define GSM_SERVICE_DBUS   "org.gnome.SessionManager"
++#define GSM_PATH_DBUS      "/org/gnome/SessionManager"
++#define GSM_INTERFACE_DBUS "org.gnome.SessionManager"
+ 
+ #define GSM_PROPERTIES_DIALOG_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), GSM_TYPE_PROPERTIES_DIALOG, GsmPropertiesDialogPrivate))
+ 
+@@ -50,6 +56,7 @@
+ #define CAPPLET_DELETE_WIDGET_NAME        "session_properties_delete_button"
+ #define CAPPLET_EDIT_WIDGET_NAME          "session_properties_edit_button"
+ #define CAPPLET_SAVE_WIDGET_NAME          "session_properties_save_button"
++#define CAPPLET_SESSION_SAVED_WIDGET_NAME "session_properties_session_saved_label"
+ #define CAPPLET_REMEMBER_WIDGET_NAME      "session_properties_remember_toggle"
+ 
+ #define STARTUP_APP_ICON     "system-run"
+@@ -493,10 +500,64 @@ on_autosave_value_toggled (GtkToggleButton     *button,
+ }
+ 
+ static void
++session_saved_message (GsmPropertiesDialog *dialog,
++                       const char *msg,
++                       gboolean is_error)
++{
++        GtkLabel *label;
++        gchar *markup;
++        label = GTK_LABEL (gtk_builder_get_object (dialog->priv->xml, CAPPLET_SESSION_SAVED_WIDGET_NAME));
++        if (is_error)
++                markup = g_markup_printf_escaped ("<span foreground=\"red\">%s</span>", msg);
++        else
++                markup = g_markup_escape_text (msg, -1);
++        gtk_label_set_markup (label, markup);
++        g_free (markup);
++}
++
++static void
++session_saved_cb (DBusGProxy *proxy,
++                  DBusGProxyCall *call_id,
++                  void *user_data)
++{
++        gboolean res;
++        GsmPropertiesDialog *dialog = user_data;
++
++        res = dbus_g_proxy_end_call (proxy, call_id, NULL, G_TYPE_INVALID);
++        if (res)
++                session_saved_message (dialog, _("Your session has been saved."), FALSE);
++        else
++                session_saved_message (dialog, _("Failed to save session"), TRUE);
++
++        g_object_unref (proxy);
++}
++
++static void
+ on_save_session_clicked (GtkWidget           *widget,
+                          GsmPropertiesDialog *dialog)
+ {
+-        g_debug ("Session saving is not implemented yet!");
++        DBusGConnection *conn;
++        DBusGProxy *proxy;
++        DBusGProxyCall *call;
++
++        conn = dbus_g_bus_get (DBUS_BUS_SESSION, NULL);
++        if (conn == NULL) {
++                session_saved_message (dialog, _("Could not connect to the session bus"), TRUE);
++                return;
++        }
++
++        proxy = dbus_g_proxy_new_for_name (conn, GSM_SERVICE_DBUS, GSM_PATH_DBUS, GSM_INTERFACE_DBUS);
++        if (proxy == NULL) {
++                session_saved_message (dialog, _("Could not connect to the session manager"), TRUE);
++                return;
++        }
++
++        call = dbus_g_proxy_begin_call (proxy, "SaveSession", session_saved_cb, dialog, NULL, G_TYPE_INVALID);
++        if (call == NULL) {
++                session_saved_message (dialog, _("Failed to save session"), TRUE);
++                g_object_unref (proxy);
++                return;
++        }
+ }
+ 
+ static void
+diff --git a/configure.in b/configure.in
+index 53211d0..c035094 100644
+--- a/configure.in
++++ b/configure.in
+@@ -61,6 +61,7 @@ PKG_CHECK_MODULES(GNOME_SESSION,
+ PKG_CHECK_MODULES(SESSION_PROPERTIES,
+         glib-2.0 >= $GLIB_REQUIRED
+         gtk+-2.0 >= $GTK_REQUIRED
++        dbus-glib-1 >= $DBUS_GLIB_REQUIRED
+ )
+ 
+ PKG_CHECK_MODULES(SPLASH,
+diff --git a/data/session-properties.ui b/data/session-properties.ui
+index ee07529..08791c9 100644
+--- a/data/session-properties.ui
++++ b/data/session-properties.ui
+@@ -148,6 +148,7 @@
+             <property name="visible">True</property>
+             <child>
+               <object class="GtkButton" id="session_properties_save_button">
++                <property name="visible">True</property>
+                 <property name="can_focus">True</property>
+                 <property name="receives_default">True</property>
+                 <child>
+@@ -191,6 +192,17 @@
+             <property name="position">1</property>
+           </packing>
+         </child>
++        <child>
++          <object class="GtkLabel" id="session_properties_session_saved_label">
++            <property name="visible">True</property>
++            <property name="wrap">True</property>
++          </object>
++          <packing>
++            <property name="expand">False</property>
++            <property name="fill">False</property>
++            <property name="position">2</property>
++          </packing>
++        </child>
+       </object>
+       <packing>
+         <property name="position">1</property>
+diff --git a/gnome-session/gsm-client.c b/gnome-session/gsm-client.c
+index b1c3c02..b063aca 100644
+--- a/gnome-session/gsm-client.c
++++ b/gnome-session/gsm-client.c
+@@ -510,6 +510,16 @@ gsm_client_disconnected (GsmClient *client)
+         g_signal_emit (client, signals[DISCONNECTED], 0);
+ }
+ 
++gboolean
++gsm_client_request_save (GsmClient *client,
++                         guint      flags,
++                         GError   **error)
++{
++        g_return_val_if_fail (GSM_IS_CLIENT (client), FALSE);
++
++        return GSM_CLIENT_GET_CLASS (client)->impl_request_save (client, flags, error);
++}
++
+ GKeyFile *
+ gsm_client_save (GsmClient *client,
+                  GError   **error)
+diff --git a/gnome-session/gsm-client.h b/gnome-session/gsm-client.h
+index 8fa28ad..a191e1d 100644
+--- a/gnome-session/gsm-client.h
++++ b/gnome-session/gsm-client.h
+@@ -92,6 +92,9 @@ struct _GsmClientClass
+                                                               GError   **error);
+         gboolean              (*impl_stop)                   (GsmClient *client,
+                                                               GError   **error);
++        gboolean              (*impl_request_save)           (GsmClient *client,
++                                                              guint      flags,
++                                                              GError   **error);
+         GKeyFile *            (*impl_save)                   (GsmClient *client,
+                                                               GError   **error);
+ };
+@@ -137,6 +140,9 @@ gboolean              gsm_client_cancel_end_session         (GsmClient  *client,
+ 
+ void                  gsm_client_disconnected               (GsmClient  *client);
+ 
++gboolean              gsm_client_request_save               (GsmClient  *client,
++                                                             guint       flags,
++                                                             GError    **error);
+ GKeyFile             *gsm_client_save                       (GsmClient  *client,
+                                                              GError    **error);
+ /* exported to bus */
+diff --git a/gnome-session/gsm-dbus-client.c b/gnome-session/gsm-dbus-client.c
+index 5c93a22..a217445 100644
+--- a/gnome-session/gsm-dbus-client.c
++++ b/gnome-session/gsm-dbus-client.c
+@@ -413,6 +413,19 @@ gsm_dbus_client_finalize (GObject *object)
+         G_OBJECT_CLASS (gsm_dbus_client_parent_class)->finalize (object);
+ }
+ 
++static gboolean
++dbus_client_request_save (GsmClient *client,
++                          guint      flags,
++                          GError   **error)
++{
++        g_debug ("GsmDBusClient: sending save request to client with id %s",
++                 gsm_client_peek_id (client));
++
++        /* FIXME: The protocol does not support this */
++
++        return FALSE;
++}
++
+ static GKeyFile *
+ dbus_client_save (GsmClient *client,
+                   GError   **error)
+@@ -665,6 +678,7 @@ gsm_dbus_client_class_init (GsmDBusClientClass *klass)
+         object_class->set_property         = gsm_dbus_client_set_property;
+         object_class->dispose              = gsm_dbus_client_dispose;
+ 
++        client_class->impl_request_save           = dbus_client_request_save;
+         client_class->impl_save                   = dbus_client_save;
+         client_class->impl_stop                   = dbus_client_stop;
+         client_class->impl_query_end_session      = dbus_client_query_end_session;
+diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
+index 5bb7b5c..e749dd8 100644
+--- a/gnome-session/gsm-manager.c
++++ b/gnome-session/gsm-manager.c
+@@ -73,6 +73,7 @@
+ #define GS_INTERFACE "org.gnome.ScreenSaver"
+ 
+ #define GSM_MANAGER_PHASE_TIMEOUT 10 /* seconds */
++#define GSM_MANAGER_SAVE_SESSION_TIMEOUT 2
+ 
+ #define GDM_FLEXISERVER_COMMAND "gdmflexiserver"
+ #define GDM_FLEXISERVER_ARGS    "--startnew Standard"
+@@ -1194,6 +1195,69 @@ query_end_session_complete (GsmManager *manager)
+ 
+ }
+ 
++static gboolean
++_client_request_save (GsmClient            *client,
++                      ClientEndSessionData *data)
++{
++        gboolean ret;
++        GError  *error;
++
++        error = NULL;
++        ret = gsm_client_request_save (client, data->flags, &error);
++        if (ret) {
++                g_debug ("GsmManager: adding client to query clients: %s", gsm_client_peek_id (client));
++                data->manager->priv->query_clients = g_slist_prepend (data->manager->priv->query_clients,
++                                                                      client);
++        } else if (error) {
++                g_debug ("GsmManager: unable to query client: %s", error->message);
++                g_error_free (error);
++        }
++
++        return FALSE;
++}
++
++static gboolean
++_client_request_save_helper (const char           *id,
++                             GsmClient            *client,
++                             ClientEndSessionData *data)
++{
++        return _client_request_save (client, data);
++}
++
++static void
++query_save_session_complete (GsmManager *manager)
++{
++        GError *error = NULL;
++
++        if (g_slist_length (manager->priv->next_query_clients) > 0) {
++                ClientEndSessionData data;
++
++                data.manager = manager;
++                data.flags = GSM_CLIENT_END_SESSION_FLAG_LAST;
++
++                g_slist_foreach (manager->priv->next_query_clients,
++                                 (GFunc)_client_request_save,
++                                 &data);
++
++                g_slist_free (manager->priv->next_query_clients);
++                manager->priv->next_query_clients = NULL;
++
++                return;
++        }
++
++        if (manager->priv->query_timeout_id > 0) {
++                g_source_remove (manager->priv->query_timeout_id);
++                manager->priv->query_timeout_id = 0;
++        }
++
++        gsm_session_save (manager->priv->clients, &error);
++
++        if (error) {
++                g_warning ("Error saving session: %s", error->message);
++                g_error_free (error);
++        }
++}
++
+ static guint32
+ generate_cookie (void)
+ {
+@@ -1268,6 +1332,21 @@ _on_query_end_session_timeout (GsmManager *manager)
+         return FALSE;
+ }
+ 
++static gboolean
++_on_query_save_session_timeout (GsmManager *manager)
++{
++        manager->priv->query_timeout_id = 0;
++
++        g_debug ("GsmManager: query to save session timed out");
++
++        g_slist_free (manager->priv->query_clients);
++        manager->priv->query_clients = NULL;
++
++        query_save_session_complete (manager);
++
++        return FALSE;
++}
++
+ static void
+ do_phase_query_end_session (GsmManager *manager)
+ {
+@@ -1904,13 +1983,32 @@ on_client_end_session_response (GsmClient  *client,
+                                 const char *reason,
+                                 GsmManager *manager)
+ {
+-        /* just ignore if received outside of shutdown */
+-        if (manager->priv->phase < GSM_MANAGER_PHASE_QUERY_END_SESSION) {
++        /* just ignore if we are not yet running */
++        if (manager->priv->phase < GSM_MANAGER_PHASE_RUNNING) {
+                 return;
+         }
+ 
+         g_debug ("GsmManager: Response from end session request: is-ok=%d do-last=%d cancel=%d reason=%s", is_ok, do_last, cancel, reason ? reason :"");
+ 
++        if (manager->priv->phase == GSM_MANAGER_PHASE_RUNNING) {
++                /* Ignore responses when no requests were sent */
++                if (manager->priv->query_clients == NULL) {
++                        return;
++                }
++
++                manager->priv->query_clients = g_slist_remove (manager->priv->query_clients, client);
++
++                if (do_last) {
++                        manager->priv->next_query_clients = g_slist_prepend (manager->priv->next_query_clients,
++                                                                             client);
++                }
++
++                if (manager->priv->query_clients == NULL) {
++                        query_save_session_complete (manager);
++                }
++                return;
++        }
++
+         if (cancel) {
+                 cancel_end_session (manager);
+                 return;
+@@ -2009,6 +2107,15 @@ on_xsmp_client_logout_request (GsmXSMPClient *client,
+ }
+ 
+ static void
++on_xsmp_client_save_request (GsmXSMPClient *client,
++                             gboolean       show_dialog,
++                             GsmManager    *manager)
++{
++        g_debug ("GsmManager: save_request");
++        gsm_manager_save_session (manager, NULL);
++}
++
++static void
+ on_store_client_added (GsmStore   *store,
+                        const char *id,
+                        GsmManager *manager)
+@@ -2029,6 +2136,10 @@ on_store_client_added (GsmStore   *store,
+                                   "logout-request",
+                                   G_CALLBACK (on_xsmp_client_logout_request),
+                                   manager);
++		g_signal_connect (client,
++				  "save-request",
++				  G_CALLBACK (on_xsmp_client_save_request),
++				  manager);
+         }
+ 
+         g_signal_connect (client,
+@@ -3329,6 +3440,41 @@ gsm_manager_shutdown (GsmManager *manager,
+ }
+ 
+ gboolean
++gsm_manager_save_session (GsmManager *manager,
++                          GError     **error)
++{
++        ClientEndSessionData data;
++
++        g_debug ("GsmManager: SaveSession called");
++
++        g_return_val_if_fail (GSM_IS_MANAGER (manager), FALSE);
++
++        if (manager->priv->phase != GSM_MANAGER_PHASE_RUNNING) {
++                g_set_error (error,
++                             GSM_MANAGER_ERROR,
++                             GSM_MANAGER_ERROR_NOT_IN_RUNNING,
++                             "SaveSession interface is only available during the Running phase");
++                return FALSE;
++        }
++
++        data.manager = manager;
++        data.flags = 0;
++        gsm_store_foreach (manager->priv->clients,
++                           (GsmStoreFunc)_client_request_save_helper,
++                           &data);
++
++        if (manager->priv->query_clients) {
++                manager->priv->query_timeout_id = g_timeout_add_seconds (GSM_MANAGER_SAVE_SESSION_TIMEOUT,
++                                                                         (GSourceFunc)_on_query_save_session_timeout,
++                                                                         manager);
++                return TRUE;
++        } else {
++                g_debug ("GsmManager: Nothing to save");
++                return FALSE;
++        }
++}
++
++gboolean
+ gsm_manager_can_shutdown (GsmManager *manager,
+                           gboolean   *shutdown_available,
+                           GError    **error)
+diff --git a/gnome-session/gsm-manager.h b/gnome-session/gsm-manager.h
+index 17c70b3..dd6f198 100644
+--- a/gnome-session/gsm-manager.h
++++ b/gnome-session/gsm-manager.h
+@@ -152,6 +152,9 @@ gboolean            gsm_manager_is_inhibited                   (GsmManager
+ gboolean            gsm_manager_shutdown                       (GsmManager     *manager,
+                                                                 GError        **error);
+ 
++gboolean            gsm_manager_save_session                   (GsmManager     *manager,
++                                                                GError        **error);
++
+ gboolean            gsm_manager_can_shutdown                   (GsmManager     *manager,
+                                                                 gboolean       *shutdown_available,
+                                                                 GError        **error);
+diff --git a/gnome-session/gsm-xsmp-client.c b/gnome-session/gsm-xsmp-client.c
+index 01d3d82..90a8824 100644
+--- a/gnome-session/gsm-xsmp-client.c
++++ b/gnome-session/gsm-xsmp-client.c
+@@ -70,6 +70,7 @@ enum {
+ enum {
+         REGISTER_REQUEST,
+         LOGOUT_REQUEST,
++	SAVE_REQUEST,
+         LAST_SIGNAL
+ };
+ 
+@@ -523,6 +524,30 @@ xsmp_cancel_end_session (GsmClient *client,
+         return TRUE;
+ }
+ 
++static gboolean
++xsmp_request_save (GsmClient *client,
++                   guint      flags,
++                   GError   **error)
++{
++        GsmXSMPClient *xsmp = (GsmXSMPClient *) client;
++
++        g_debug ("GsmXSMPClient: xsmp_request_save ('%s')", xsmp->priv->description);
++
++        if (xsmp->priv->conn == NULL) {
++                g_set_error (error,
++                             GSM_CLIENT_ERROR,
++                             GSM_CLIENT_ERROR_NOT_REGISTERED,
++                             "Client is not registered");
++                return FALSE;
++        }
++
++        if (flags & GSM_CLIENT_END_SESSION_FLAG_LAST)
++                xsmp_save_yourself_phase2 (client);
++        else
++                do_save_yourself (xsmp, SmSaveLocal, FALSE);
++
++        return TRUE;
++}
+ static char *
+ get_desktop_file_path (GsmXSMPClient *client)
+ {
+@@ -1004,6 +1029,7 @@ gsm_xsmp_client_class_init (GsmXSMPClientClass *klass)
+         object_class->get_property         = gsm_xsmp_client_get_property;
+         object_class->set_property         = gsm_xsmp_client_set_property;
+ 
++        client_class->impl_request_save           = xsmp_request_save;
+         client_class->impl_save                   = xsmp_save;
+         client_class->impl_stop                   = xsmp_stop;
+         client_class->impl_query_end_session      = xsmp_query_end_session;
+@@ -1034,6 +1060,17 @@ gsm_xsmp_client_class_init (GsmXSMPClientClass *klass)
+                               G_TYPE_NONE,
+                               1, G_TYPE_BOOLEAN);
+ 
++	signals[SAVE_REQUEST] =
++		g_signal_new ("save-request",
++                              G_OBJECT_CLASS_TYPE (object_class),
++                              G_SIGNAL_RUN_LAST,
++                              G_STRUCT_OFFSET (GsmXSMPClientClass, save_request),
++                              NULL,
++                              NULL,
++                              g_cclosure_marshal_VOID__BOOLEAN,
++                              G_TYPE_NONE,
++                              1, G_TYPE_BOOLEAN);
++
+         g_object_class_install_property (object_class,
+                                          PROP_ICE_CONNECTION,
+                                          g_param_spec_pointer ("ice-connection",
+diff --git a/gnome-session/gsm-xsmp-client.h b/gnome-session/gsm-xsmp-client.h
+index b80f933..8f9ddd9 100644
+--- a/gnome-session/gsm-xsmp-client.h
++++ b/gnome-session/gsm-xsmp-client.h
+@@ -54,7 +54,8 @@ struct _GsmXSMPClientClass
+                                           char          **client_id);
+         gboolean (*logout_request)       (GsmXSMPClient  *client,
+                                           gboolean        prompt);
+-
++        gboolean (*save_request)         (GsmXSMPClient  *client,
++                                          gboolean        prompt);
+ 
+         void     (*saved_state)          (GsmXSMPClient  *client);
+ 
+diff --git a/gnome-session/org.gnome.SessionManager.xml b/gnome-session/org.gnome.SessionManager.xml
+index b8bec4e..bece3f5 100644
+--- a/gnome-session/org.gnome.SessionManager.xml
++++ b/gnome-session/org.gnome.SessionManager.xml
+@@ -256,6 +256,14 @@
+       </doc:doc>
+     </method>
+ 
++    <method name="SaveSession">
++      <doc:doc>
++	<doc:description>
++	  <doc:para>Request to save session</doc:para>
++	</doc:description>
++      </doc:doc>
++    </method>
++
+     <method name="CanShutdown">
+       <arg name="is_available" direction="out" type="b">
+         <doc:doc>
+-- 
+1.7.1
+
+
+From eaca89e3f4a856c24ebede8f02662c022d1ffcb5 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Mon, 22 Mar 2010 13:00:58 -0400
+Subject: [PATCH 2/7] Allow saved-session directory to be a symlink
+
+This gives us the option of adding a rudimentary session
+chooser later.
+---
+ gnome-session/gsm-session-save.c |   36 ++++++++++++++++++++++++++++++------
+ gnome-session/gsm-util.c         |    6 ------
+ 2 files changed, 30 insertions(+), 12 deletions(-)
+
+diff --git a/gnome-session/gsm-session-save.c b/gnome-session/gsm-session-save.c
+index b31d9fa..7d3616f 100644
+--- a/gnome-session/gsm-session-save.c
++++ b/gnome-session/gsm-session-save.c
+@@ -147,13 +147,37 @@ gsm_session_save (GsmStore  *client_store,
+                            &data);
+ 
+         if (!*error) {
+-                /* remove the old saved session */
+-                gsm_session_clear_saved_session (save_dir, data.discard_hash);
++                char *session_dir;
+ 
+-                /* rename the temp session dir */
+-                if (g_file_test (save_dir, G_FILE_TEST_IS_DIR))
+-                        g_rmdir (save_dir);
+-                g_rename (tmp_dir, save_dir);
++                if (g_file_test (save_dir, G_FILE_TEST_IS_SYMLINK))
++                        session_dir = g_file_read_link (save_dir, error);
++                else
++                        session_dir = g_strdup (save_dir);
++
++                if (session_dir != NULL) {
++
++                        char *absolute_session_dir;
++
++                        if (g_path_is_absolute (session_dir)) {
++                                absolute_session_dir = g_strdup (session_dir);
++                        } else {
++                                char *parent_dir;
++
++                                parent_dir = g_path_get_dirname (save_dir);
++                                absolute_session_dir = g_build_filename (parent_dir, session_dir, NULL);
++                                g_free (parent_dir);
++                        }
++                        g_free (session_dir);
++
++                        /* remove the old saved session */
++                        gsm_session_clear_saved_session (absolute_session_dir, data.discard_hash);
++
++                        if (g_file_test (absolute_session_dir, G_FILE_TEST_IS_DIR))
++                                g_rmdir (absolute_session_dir);
++                        g_rename (tmp_dir, absolute_session_dir);
++
++                        g_free (absolute_session_dir);
++                }
+         } else {
+                 g_warning ("GsmSessionSave: error saving session: %s", (*error)->message);
+                 /* FIXME: we should create a hash table filled with the discard
+diff --git a/gnome-session/gsm-util.c b/gnome-session/gsm-util.c
+index b60d994..0a61328 100644
+--- a/gnome-session/gsm-util.c
++++ b/gnome-session/gsm-util.c
+@@ -126,15 +126,9 @@ gsm_util_find_desktop_file_for_app_name (const char *name,
+ static gboolean
+ ensure_dir_exists (const char *dir)
+ {
+-        if (g_file_test (dir, G_FILE_TEST_IS_DIR))
+-                return TRUE;
+-
+         if (g_mkdir_with_parents (dir, 0755) == 0)
+                 return TRUE;
+ 
+-        if (errno == EEXIST)
+-                return g_file_test (dir, G_FILE_TEST_IS_DIR);
+-
+         g_warning ("GsmSessionSave: Failed to create directory %s: %s", dir, strerror (errno));
+ 
+         return FALSE;
+-- 
+1.7.1
+
+
+From be60a92f3f6cbcd757d7b243c768edc2157afcdd Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Mon, 22 Mar 2010 13:10:29 -0400
+Subject: [PATCH 3/7] Add new autosave_one_shot gconf key
+
+This initiates a save for the next session without changing
+the users default settings for session autosaving.
+---
+ data/gnome-session.schemas.in.in |   11 +++++++++++
+ gnome-session/gsm-manager.c      |   36 +++++++++++++++++++++++++++++++++---
+ 2 files changed, 44 insertions(+), 3 deletions(-)
+
+diff --git a/data/gnome-session.schemas.in.in b/data/gnome-session.schemas.in.in
+index 4a635be..ef491b8 100644
+--- a/data/gnome-session.schemas.in.in
++++ b/data/gnome-session.schemas.in.in
+@@ -36,6 +36,17 @@
+          </locale>
+       </schema>
+       <schema>
++         <key>/schemas/apps/gnome-session/options/auto_save_session_one_shot</key>
++         <applyto>/apps/gnome-session/options/auto_save_session_one_shot</applyto>
++         <owner>gnome</owner>
++         <type>bool</type>
++         <default>false</default>
++         <locale name="C">
++            <short>Save sessions</short>
++            <long>When enabled, gnome-session will automatically save the next session at log out even if auto saving is disabled.</long>
++         </locale>
++      </schema>
++      <schema>
+          <key>/schemas/apps/gnome-session/options/logout_prompt</key>
+          <applyto>/apps/gnome-session/options/logout_prompt</applyto>
+          <owner>gnome</owner>
+diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
+index e749dd8..2036ebb 100644
+--- a/gnome-session/gsm-manager.c
++++ b/gnome-session/gsm-manager.c
+@@ -89,6 +89,7 @@
+ #define KEY_MAX_IDLE_ACTION       KEY_DESKTOP_DIR "/max_idle_action"
+ 
+ #define KEY_GNOME_SESSION_DIR     "/apps/gnome-session/options"
++#define KEY_AUTOSAVE_ONE_SHOT     KEY_GNOME_SESSION_DIR "/auto_save_session_one_shot"
+ #define KEY_AUTOSAVE              KEY_GNOME_SESSION_DIR "/auto_save_session"
+ 
+ #define KEY_SLEEP_LOCK            "/apps/gnome-screensaver/lock_enabled"
+@@ -430,11 +431,25 @@ quit_request_completed (GsmConsolekit *consolekit,
+ static void
+ gsm_manager_quit (GsmManager *manager)
+ {
++        GError *error;
+         GsmConsolekit *consolekit;
+ 
+         /* See the comment in request_reboot() for some more details about how
+          * this works. */
+ 
++        /* Clear one shot key autosave in the event its set (so that it's actually
++         * one shot only)
++         */
++        error = NULL;
++        if (!gconf_client_set_bool (manager->priv->gconf_client,
++                                    KEY_AUTOSAVE_ONE_SHOT,
++                                    FALSE,
++                                    &error)) {
++                g_warning ("Error clearing configuration key '%s': %s",
++                           KEY_AUTOSAVE_ONE_SHOT,
++                           error->message);
++        }
++
+         switch (manager->priv->logout_type) {
+         case GSM_MANAGER_LOGOUT_LOGOUT:
+                 gtk_main_quit ();
+@@ -1925,19 +1940,34 @@ auto_save_is_enabled (GsmManager *manager)
+ 
+         error = NULL;
+         auto_save = gconf_client_get_bool (manager->priv->gconf_client,
+-                                           KEY_AUTOSAVE,
++                                           KEY_AUTOSAVE_ONE_SHOT,
+                                            &error);
+ 
+         if (error) {
+                 g_warning ("Error retrieving configuration key '%s': %s",
+-                           KEY_AUTOSAVE,
++                           KEY_AUTOSAVE_ONE_SHOT,
+                            error->message);
+                 g_error_free (error);
+ 
+-                /* If we fail to query gconf key, disable auto save */
+                 auto_save = FALSE;
+         }
+ 
++        if (!auto_save) {
++                auto_save = gconf_client_get_bool (manager->priv->gconf_client,
++                                                   KEY_AUTOSAVE,
++                                                   &error);
++
++                if (error) {
++                        g_warning ("Error retrieving configuration key '%s': %s",
++                                   KEY_AUTOSAVE,
++                                   error->message);
++                        g_error_free (error);
++
++                        /* If we fail to query gconf key, disable auto save */
++                        auto_save = FALSE;
++                }
++        }
++
+         return auto_save;
+ }
+ 
+-- 
+1.7.1
+
+
+From 25b82d16b820bfd9d24c46b7cf6b7ec1e5f4eb8b Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Mon, 21 Jun 2010 15:16:47 -0400
+Subject: [PATCH 4/7] Clear one-shot key on save, not logout
+
+Right now save only happens at logout, but in the future
+after https://bugzilla.gnome.org/show_bug.cgi?id=575544
+is resolved, it will be able to happen at other times
+as well.
+
+This commit moves the one_shot checking code to a more
+proper place, so it will continue to work if bug 575544
+ever lands.
+---
+ gnome-session/gsm-manager.c      |   14 --------------
+ gnome-session/gsm-session-save.c |   27 +++++++++++++++++++++++++++
+ 2 files changed, 27 insertions(+), 14 deletions(-)
+
+diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
+index 2036ebb..2fec451 100644
+--- a/gnome-session/gsm-manager.c
++++ b/gnome-session/gsm-manager.c
+@@ -431,25 +431,11 @@ quit_request_completed (GsmConsolekit *consolekit,
+ static void
+ gsm_manager_quit (GsmManager *manager)
+ {
+-        GError *error;
+         GsmConsolekit *consolekit;
+ 
+         /* See the comment in request_reboot() for some more details about how
+          * this works. */
+ 
+-        /* Clear one shot key autosave in the event its set (so that it's actually
+-         * one shot only)
+-         */
+-        error = NULL;
+-        if (!gconf_client_set_bool (manager->priv->gconf_client,
+-                                    KEY_AUTOSAVE_ONE_SHOT,
+-                                    FALSE,
+-                                    &error)) {
+-                g_warning ("Error clearing configuration key '%s': %s",
+-                           KEY_AUTOSAVE_ONE_SHOT,
+-                           error->message);
+-        }
+-
+         switch (manager->priv->logout_type) {
+         case GSM_MANAGER_LOGOUT_LOGOUT:
+                 gtk_main_quit ();
+diff --git a/gnome-session/gsm-session-save.c b/gnome-session/gsm-session-save.c
+index 7d3616f..0faa425 100644
+--- a/gnome-session/gsm-session-save.c
++++ b/gnome-session/gsm-session-save.c
+@@ -26,9 +26,13 @@
+ #include "gsm-util.h"
+ #include "gsm-autostart-app.h"
+ #include "gsm-client.h"
++#include <gconf/gconf-client.h>
+ 
+ #include "gsm-session-save.h"
+ 
++#define KEY_GNOME_SESSION_DIR     "/apps/gnome-session/options"
++#define KEY_AUTOSAVE_ONE_SHOT     KEY_GNOME_SESSION_DIR "/auto_save_session_one_shot"
++
+ static gboolean gsm_session_clear_saved_session (const char *directory,
+                                                  GHashTable *discard_hash);
+ 
+@@ -117,12 +121,35 @@ void
+ gsm_session_save (GsmStore  *client_store,
+                   GError   **error)
+ {
++        GConfClient     *gconf_client;
+         const char      *save_dir;
+         char            *tmp_dir;
+         SessionSaveData  data;
+ 
+         g_debug ("GsmSessionSave: Saving session");
+ 
++        gconf_client = gconf_client_get_default ();
++
++        if (gconf_client != NULL) {
++                GError *gconf_error;
++
++                /* Clear one shot key autosave in the event its set (so that it's actually
++                 * one shot only)
++                 */
++                gconf_error = NULL;
++                if (!gconf_client_set_bool (gconf_client,
++                                            KEY_AUTOSAVE_ONE_SHOT,
++                                            FALSE,
++                                            &gconf_error)) {
++                        g_warning ("Error clearing configuration key '%s': %s",
++                                   KEY_AUTOSAVE_ONE_SHOT,
++                                   gconf_error->message);
++                        g_error_free (gconf_error);
++                }
++
++                g_object_unref (gconf_client);
++        }
++
+         save_dir = gsm_util_get_saved_session_dir ();
+         if (save_dir == NULL) {
+                 g_warning ("GsmSessionSave: cannot create saved session directory");
+-- 
+1.7.1
+
+
+From 527fe05785019fe69ea074f55a0260ed15473412 Mon Sep 17 00:00:00 2001
+From: Matthias Clasen <mclasen@redhat.com>
+Date: Mon, 22 Mar 2010 13:12:17 -0400
+Subject: [PATCH 5/7] Add new custom session selector
+
+This allows the user to define and switch between separate saved
+sessions at login time, and choose session names to save to after
+login.
+
+Add load support
+---
+ configure.in                         |   15 +
+ data/Makefile.am                     |   10 +-
+ data/gnome-custom-session.desktop.in |    5 +
+ data/session-selector.ui             |  195 ++++++++
+ doc/man/Makefile.am                  |    3 +-
+ doc/man/gnome-session-selector.1     |   31 ++
+ po/POTFILES.in                       |    3 +
+ tools/Makefile.am                    |   16 +-
+ tools/gnome-session-custom-session   |    4 +
+ tools/gnome-session-selector.c       |  806 ++++++++++++++++++++++++++++++++++
+ 10 files changed, 1085 insertions(+), 3 deletions(-)
+ create mode 100644 data/gnome-custom-session.desktop.in
+ create mode 100644 data/session-selector.ui
+ create mode 100644 doc/man/gnome-session-selector.1
+ create mode 100644 tools/gnome-session-custom-session
+ create mode 100644 tools/gnome-session-selector.c
+
+diff --git a/configure.in b/configure.in
+index c035094..e74053a 100644
+--- a/configure.in
++++ b/configure.in
+@@ -75,6 +75,21 @@ PKG_CHECK_MODULES(COMPAT,
+         gtk+-2.0 >= $GTK_REQUIRED
+         dbus-glib-1 >= $DBUS_GLIB_REQUIRED)
+ 
++AC_ARG_ENABLE(session-selector, AS_HELP_STRING([--enable-session-selector],
++                                               [enable building a custom session selector dialog]),
++                                                enable_session_selector=$enableval,enable_session_selector=no)
++
++AM_CONDITIONAL(BUILD_SESSION_SELECTOR,
++               [test "$enable_session_selector" = yes])
++
++if test "$enable_session_selector" = yes; then
++        PKG_CHECK_MODULES(SESSION_SELECTOR,
++                          dbus-glib-1 >= $DBUS_GLIB_REQUIRED
++                          gtk+-2.0 >= 2.18
++                          gmodule-export-2.0
++                          gconf-2.0)
++fi
++
+ PKG_CHECK_MODULES(SM, sm)
+ PKG_CHECK_MODULES(ICE, ice)
+ 
+diff --git a/data/Makefile.am b/data/Makefile.am
+index 8899c5b..6986bbd 100644
+--- a/data/Makefile.am
++++ b/data/Makefile.am
+@@ -6,12 +6,20 @@ uidir = $(pkgdatadir)
+ ui_DATA = \
+ 	session-properties.ui	\
+ 	gsm-inhibit-dialog.ui	\
++	session-selector.ui	\
+ 	$(NULL)
+ 
+ @INTLTOOL_DESKTOP_RULE@
+ 
+ xsessiondir = $(datadir)/xsessions
+-xsession_in_files = gnome.desktop.in
++xsession_in_files = \
++	gnome.desktop.in		\
++	$(NULL)
++
++if BUILD_SESSION_SELECTOR
++xsession_in_files += gnome-custom-session.desktop.in
++endif
++
+ xsession_DATA = $(xsession_in_files:.desktop.in=.desktop)
+ 
+ @INTLTOOL_SCHEMAS_RULE@
+diff --git a/data/gnome-custom-session.desktop.in b/data/gnome-custom-session.desktop.in
+new file mode 100644
+index 0000000..ae36952
+--- /dev/null
++++ b/data/gnome-custom-session.desktop.in
+@@ -0,0 +1,5 @@
++[Desktop Entry]
++_Name=Custom
++_Comment=This entry lets you select a saved session
++Exec=gnome-session-custom-session
++TryExec=gnome-session-custom-session
+diff --git a/data/session-selector.ui b/data/session-selector.ui
+new file mode 100644
+index 0000000..1c55712
+--- /dev/null
++++ b/data/session-selector.ui
+@@ -0,0 +1,195 @@
++<?xml version="1.0"?>
++<interface>
++  <requires lib="gtk+" version="2.16"/>
++  <!-- interface-naming-policy project-wide -->
++  <object class="GtkListStore" id="session-store">
++    <columns>
++      <!-- column-name name -->
++      <column type="gchararray"/>
++    </columns>
++  </object>
++  <object class="GtkTreeModelSort" id="sort-model">
++    <property name="model">session-store</property>
++  </object>
++  <object class="GtkWindow" id="main-window">
++    <property name="title" translatable="yes">Custom Session</property>
++    <property name="window_position">center</property>
++    <property name="default_width">500</property>
++    <property name="default_height">310</property>
++    <property name="decorated">False</property>
++    <child>
++      <object class="GtkFrame" id="frame1">
++        <property name="visible">True</property>
++        <property name="label_xalign">0.5</property>
++        <property name="shadow_type">out</property>
++        <child>
++          <object class="GtkAlignment" id="alignment3">
++            <property name="visible">True</property>
++            <property name="border_width">12</property>
++            <child>
++              <object class="GtkVBox" id="vbox3">
++                <property name="visible">True</property>
++                <property name="orientation">vertical</property>
++                <property name="spacing">6</property>
++
++                <child>
++                  <object class="GtkInfoBar" id="info-bar">
++                    <property name="visible">True</property>
++                    <property name="message-type">other</property>
++
++                    <child internal-child="content_area">
++                      <object class="GtkHBox" id="info-bar-content_area">
++                        <property name="visible">True</property>
++                        <property name="orientation">vertical</property>
++                        <property name="spacing">0</property>
++                        <child>
++                          <object class="GtkLabel" id="info-label">
++                            <property name="visible">True</property>
++                            <property name="xalign">0.0</property>
++                            <property name="yalign">0.5</property>
++                            <property name="label" translatable="yes">Please select a custom session to run</property>
++                          </object>
++                          <packing>
++                            <property name="expand">True</property>
++                            <property name="fill">True</property>
++                            <property name="position">0</property>
++                          </packing>
++                        </child>
++                      </object>
++                    </child>
++                  </object>
++                  <packing>
++                    <property name="expand">False</property>
++                    <property name="fill">True</property>
++                    <property name="position">0</property>
++                  </packing>
++                </child>
++                <child>
++                  <object class="GtkVBox" id="vbox4">
++                    <property name="visible">True</property>
++                    <property name="orientation">vertical</property>
++                    <property name="spacing">12</property>
++                    <child>
++                      <object class="GtkHBox" id="hbox3">
++                        <property name="visible">True</property>
++                        <property name="spacing">12</property>
++                        <child>
++                          <object class="GtkScrolledWindow" id="scrolledwindow2">
++                            <property name="visible">True</property>
++                            <property name="can_focus">True</property>
++                            <property name="hscrollbar_policy">never</property>
++                            <property name="vscrollbar_policy">automatic</property>
++                            <property name="shadow_type">in</property>
++                            <child>
++                              <object class="GtkTreeView" id="session-list">
++                                <property name="visible">True</property>
++                                <property name="can_focus">True</property>
++                                <property name="headers_visible">False</property>
++                                <property name="search_column">0</property>
++                                <property name="model">sort-model</property>
++                              </object>
++                            </child>
++                          </object>
++                          <packing>
++                            <property name="position">0</property>
++                          </packing>
++                        </child>
++                        <child>
++                          <object class="GtkVButtonBox" id="vbuttonbox2">
++                            <property name="visible">True</property>
++                            <property name="orientation">vertical</property>
++                            <property name="spacing">6</property>
++                            <property name="layout_style">start</property>
++                            <child>
++                              <object class="GtkButton" id="new-session">
++                                <property name="label" translatable="yes">_New Session</property>
++                                <property name="visible">True</property>
++                                <property name="can_focus">True</property>
++                                <property name="receives_default">True</property>
++                                <property name="use_underline">True</property>
++                              </object>
++                              <packing>
++                                <property name="expand">False</property>
++                                <property name="fill">False</property>
++                                <property name="position">0</property>
++                              </packing>
++                            </child>
++                            <child>
++                              <object class="GtkButton" id="remove-session">
++                                <property name="label" translatable="yes">_Remove Session</property>
++                                <property name="visible">True</property>
++                                <property name="can_focus">True</property>
++                                <property name="receives_default">True</property>
++                                <property name="use_underline">True</property>
++                              </object>
++                              <packing>
++                                <property name="expand">False</property>
++                                <property name="fill">False</property>
++                                <property name="position">1</property>
++                              </packing>
++                            </child>
++                            <child>
++                              <object class="GtkButton" id="rename-session">
++                                <property name="label" translatable="yes">Rena_me Session</property>
++                                <property name="visible">True</property>
++                                <property name="can_focus">True</property>
++                                <property name="receives_default">True</property>
++                                <property name="use_underline">True</property>
++                              </object>
++                              <packing>
++                                <property name="expand">False</property>
++                                <property name="fill">False</property>
++                                <property name="position">2</property>
++                              </packing>
++                            </child>
++                          </object>
++                          <packing>
++                            <property name="expand">False</property>
++                            <property name="position">1</property>
++                          </packing>
++                        </child>
++                      </object>
++                      <packing>
++                        <property name="position">1</property>
++                      </packing>
++                    </child>
++                  </object>
++                  <packing>
++                    <property name="position">1</property>
++                  </packing>
++                </child>
++                <child>
++                  <object class="GtkHButtonBox" id="hbuttonbox2">
++                    <property name="visible">True</property>
++                    <property name="spacing">6</property>
++                    <property name="layout_style">end</property>
++                    <child>
++                      <object class="GtkButton" id="continue-button">
++                        <property name="label" translatable="yes">_Continue</property>
++                        <property name="visible">True</property>
++                        <property name="can_focus">True</property>
++                        <property name="can_default">True</property>
++                        <property name="has_default">True</property>
++                        <property name="receives_default">True</property>
++                        <property name="use_underline">True</property>
++                      </object>
++                      <packing>
++                        <property name="expand">False</property>
++                        <property name="fill">False</property>
++                        <property name="position">0</property>
++                      </packing>
++                    </child>
++                  </object>
++                  <packing>
++                    <property name="expand">False</property>
++                    <property name="position">2</property>
++                  </packing>
++                </child>
++              </object>
++            </child>
++          </object>
++        </child>
++      </object>
++    </child>
++  </object>
++</interface>
+diff --git a/doc/man/Makefile.am b/doc/man/Makefile.am
+index 8b66899..83be932 100644
+--- a/doc/man/Makefile.am
++++ b/doc/man/Makefile.am
+@@ -2,7 +2,8 @@ man_MANS =				\
+ 	gnome-session.1			\
+ 	gnome-session-properties.1	\
+ 	gnome-session-save.1		\
+-	gnome-wm.1
++	gnome-wm.1			\
++	gnome-session-selector.1
+ 
+ EXTRA_DIST =			\
+ 	$(man_MANS)
+diff --git a/doc/man/gnome-session-selector.1 b/doc/man/gnome-session-selector.1
+new file mode 100644
+index 0000000..8871755
+--- /dev/null
++++ b/doc/man/gnome-session-selector.1
+@@ -0,0 +1,31 @@
++.\"
++.\" gnome-session-selector manual page.
++.\" (C) 2010 Red Hat, Inc.
++.\"
++.TH GNOME-SESSION-SELECTOR 1 "GNOME"
++.SH NAME
++gnome-session-selector \- Selects a session to use with gnome-session
++.SH SYNOPSIS
++.B gnome-session-selector ([session]|--action [(save|print|load))])
++.SH DESCRIPTION
++\fIgnome-session-selector \fP can be used from a xsession desktop file to select
++a session before gnome-session is run. \fIgnome-session\fP reads and stores
++its session in the "${XDG_DATA_HOME}/gnome-session/saved-session" directory.
++\fIgnome-session-selector\fP works by replacing the saved-session directory by a
++symlink to another directory. Since the session name is used as the directory
++name, it may not contain '/' characters or begin with a '.'.
++
++.PP
++When a session name is specified, \fIgnome-session-selector\fP will create a symlink
++to select this session.
++
++When started without arguments or with --action load,
++\fIgnome-session-selector\fP will present a dialog that allows to choose one of the
++existing sessions or create a new one.
++
++When started with --action save, \fIgnome-session-selector\fP will present a dialog
++that allows to choose a session, or create a new one, then performs a session
++save operation.
++
++.SH SEE ALSO
++.BR gnome-session(1)
+diff --git a/po/POTFILES.in b/po/POTFILES.in
+index 5992a1c..1d6769b 100644
+--- a/po/POTFILES.in
++++ b/po/POTFILES.in
+@@ -6,9 +6,11 @@ capplet/gsp-app.c
+ capplet/main.c
+ compat/gnome-settings-daemon-helper.c
+ compat/gnome-settings-daemon-helper.desktop.in.in.in
++data/gnome-custom-session.desktop.in
+ data/gnome.desktop.in
+ data/gnome-session.schemas.in.in
+ data/gnome-wm.desktop.in.in
++[type: gettext/glade]data/session-selector.ui
+ [type: gettext/glade]data/gsm-inhibit-dialog.ui
+ data/session-properties.desktop.in.in
+ [type: gettext/glade]data/session-properties.ui
+@@ -24,4 +26,5 @@ gnome-session/gsm-util.c
+ gnome-session/main.c
+ splash/gnome-session-splash.c
+ splash/gnome-session-splash.desktop.in.in.in
++tools/gnome-session-selector.c
+ tools/gnome-session-save.c
+diff --git a/tools/Makefile.am b/tools/Makefile.am
+index 6d3813f..7f8637b 100644
+--- a/tools/Makefile.am
++++ b/tools/Makefile.am
+@@ -1,11 +1,17 @@
+ bin_PROGRAMS = gnome-session-save
+ 
++if BUILD_SESSION_SELECTOR
++bin_PROGRAMS += gnome-session-selector
++dist_bin_SCRIPTS = gnome-session-custom-session
++endif
++
+ INCLUDES =					\
+ 	$(WARN_CFLAGS)				\
+ 	$(DISABLE_DEPRECATED_CFLAGS)		\
+ 	$(GNOME_SESSION_CFLAGS)			\
+ 	$(DBUS_GLIB_CFLAGS)			\
+-	$(GCONF_FLAGS)				\
++	$(GCONF_CFLAGS)				\
++	-DGTKBUILDER_DIR=\""$(pkgdatadir)"\"	\
+ 	-DLOCALE_DIR=\""$(datadir)/locale"\"
+ 
+ gnome_session_save_LDADD =			\
+@@ -18,4 +24,12 @@ gnome_session_save_LDADD =			\
+ gnome_session_save_SOURCES =			\
+ 	gnome-session-save.c
+ 
++if BUILD_SESSION_SELECTOR
++gnome_session_selector_LDADD = 				\
++	$(SESSION_SELECTOR_LIBS)
++
++gnome_session_selector_SOURCES = 			\
++	gnome-session-selector.c
++endif
++
+ -include $(top_srcdir)/git.mk
+diff --git a/tools/gnome-session-custom-session b/tools/gnome-session-custom-session
+new file mode 100644
+index 0000000..07fdb0c
+--- /dev/null
++++ b/tools/gnome-session-custom-session
+@@ -0,0 +1,4 @@
++#! /bin/sh
++
++gnome-session-selector
++exec gnome-session
+diff --git a/tools/gnome-session-selector.c b/tools/gnome-session-selector.c
+new file mode 100644
+index 0000000..6d1e062
+--- /dev/null
++++ b/tools/gnome-session-selector.c
+@@ -0,0 +1,806 @@
++/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
++ *
++ * Copyright 2010  Red Hat, Inc,
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++ *
++ * Written by: Matthias Clasen <mclasen@redhat.com>
++ */
++
++#include "config.h"
++
++#include <fcntl.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <unistd.h>
++
++#include <glib.h>
++#include <gtk/gtk.h>
++#include <gconf/gconf-client.h>
++
++#include <glib/gi18n.h>
++#include <glib/gstdio.h>
++
++#include <dbus/dbus-glib.h>
++#include <dbus/dbus-glib-lowlevel.h>
++
++#define GSM_SERVICE_DBUS   "org.gnome.SessionManager"
++#define GSM_PATH_DBUS      "/org/gnome/SessionManager"
++#define GSM_INTERFACE_DBUS "org.gnome.SessionManager"
++
++#define KEY_GNOME_SESSION_DIR     "/apps/gnome-session/options"
++#define KEY_AUTOSAVE_ONE_SHOT     KEY_GNOME_SESSION_DIR "/auto_save_session_one_shot"
++
++static GtkBuilder *builder;
++static GtkWidget *session_list;
++static GtkListStore *store;
++static GtkTreeModelSort *sort_model;
++
++static void select_session (const char *name);
++
++static char *
++get_session_path (const char *name)
++{
++        return g_build_filename (g_get_user_config_dir (), "gnome-session", name, NULL);
++}
++
++static char *
++find_new_session_name (void)
++{
++        char *name;
++        char *path;
++        int i;
++
++        for (i = 1; i < 20; i++) {
++                name = g_strdup_printf (_("Session %d"), i);
++                path = get_session_path (name);
++                if (!g_file_test (path, G_FILE_TEST_EXISTS)) {
++                        g_free (path);
++                        return name;
++                }
++                g_free (path);
++                g_free (name);
++        }
++
++        return NULL;
++}
++
++static gboolean
++is_valid_session_name (const char *name)
++{
++        GtkTreeIter iter;
++        char *n;
++        const char *info_text;
++        char *warning_text;
++        gboolean user_tried_dot;
++        gboolean user_tried_slash;
++        GtkWidget *info_bar;
++        GtkWidget *label;
++
++        if (name[0] == 0) {
++                return FALSE;
++        }
++
++        if (name[0] == '.') {
++            user_tried_dot = TRUE;
++        } else {
++            user_tried_dot = FALSE;
++        }
++
++        if (strchr (name, '/') != NULL) {
++            user_tried_slash = TRUE;
++        } else {
++            user_tried_slash = FALSE;
++        }
++
++        info_text = _("Please select a custom session to run");
++        warning_text = NULL;
++        if (user_tried_dot && user_tried_slash) {
++            warning_text = g_strdup_printf ("%s\n<small><b>Note:</b> <i>%s</i></small>",
++                                            info_text,
++                                            _("Session names are not allowed to start with ‘.’ or contain ‘/’ characters"));
++        } else if (user_tried_dot) {
++            warning_text = g_strdup_printf ("%s\n<small><b>Note:</b> <i>%s</i></small>",
++                                            info_text,
++                                            _("Session names are not allowed to start with ‘.’"));
++        } else if (user_tried_slash) {
++            warning_text = g_strdup_printf ("%s\n<small><b>Note:</b> <i>%s</i></small>",
++                                            info_text,
++                                            _("Session names are not allowed to contain ‘/’ characters"));
++        }
++
++        gtk_tree_model_get_iter_first (GTK_TREE_MODEL (store), &iter);
++        do {
++                gtk_tree_model_get (GTK_TREE_MODEL (store), &iter, 0, &n, -1);
++                if (strcmp (n, name) == 0) {
++                        char *message;
++                        message = g_strdup_printf (_("A session named ‘%s’ already exists"), name);
++                        warning_text = g_strdup_printf ("%s\n<small><b>Note:</b> <i>%s</i></small>", info_text, message);
++                        g_free (message);
++                        g_free (n);
++                        break;
++                }
++                g_free (n);
++        } while (gtk_tree_model_iter_next (GTK_TREE_MODEL (store), &iter));
++
++        info_bar = (GtkWidget *) gtk_builder_get_object (builder, "info-bar");
++        label = (GtkWidget*) gtk_builder_get_object (builder, "info-label");
++
++        if (warning_text != NULL) {
++            gtk_info_bar_set_message_type (GTK_INFO_BAR (info_bar), GTK_MESSAGE_WARNING);
++            gtk_label_set_markup (GTK_LABEL (label), warning_text);
++            g_free (warning_text);
++            return FALSE;
++        }
++
++        gtk_info_bar_set_message_type (GTK_INFO_BAR (info_bar), GTK_MESSAGE_OTHER);
++        gtk_label_set_markup (GTK_LABEL (label), info_text);
++
++        return TRUE;
++}
++
++static void
++populate_session_list (GtkWidget *session_list)
++{
++        GtkTreeIter iter;
++        char *path;
++        const char *name;
++        GDir *dir;
++        GError *error;
++        char *saved_session;
++        char *default_session;
++        char *default_name;
++        char last_session[PATH_MAX] = "";
++
++        saved_session = get_session_path ("saved-session");
++
++        if (!g_file_test (saved_session, G_FILE_TEST_IS_SYMLINK)) {
++                default_name = find_new_session_name ();
++                default_session = get_session_path (default_name);
++                rename (saved_session, default_session);
++                if (symlink (default_name, saved_session) < 0)
++                        g_warning ("Failed to convert saved-session to symlink");
++                g_free (default_name);
++                g_free (default_session);
++        }
++
++        path = g_build_filename (g_get_user_config_dir (), "gnome-session", NULL);
++        error = NULL;
++        dir = g_dir_open (path, 0, &error);
++        if (dir == NULL) {
++                g_warning ("Failed to open %s: %s", path, error->message);
++                g_error_free (error);
++                goto out;
++        }
++
++        default_name = NULL;
++        if (readlink (saved_session, last_session, PATH_MAX - 1) > 0) {
++                default_name = g_path_get_basename (last_session);
++        }
++
++        while ((name = g_dir_read_name (dir)) != NULL) {
++                if (strcmp (name, "saved-session") == 0)
++                        continue;
++
++                gtk_list_store_insert_with_values (store, &iter, 100, 0, name, -1);
++
++                if (g_strcmp0 (default_name, name) == 0) {
++                        GtkTreeSelection *selection;
++                        GtkTreeIter child_iter;
++
++                        gtk_tree_model_sort_convert_child_iter_to_iter (GTK_TREE_MODEL_SORT (sort_model), &child_iter, &iter);
++                        selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (session_list));
++                        gtk_tree_selection_select_iter (selection, &child_iter);
++                }
++        }
++
++        g_free (default_name);
++        g_dir_close (dir);
++
++ out:
++        g_free (saved_session);
++        g_free (path);
++}
++
++static char *
++get_last_session (void)
++{
++        char *saved_session;
++        char last_session[PATH_MAX] = "";
++        char *name = NULL;
++
++        saved_session = get_session_path ("saved-session");
++
++        if (readlink (saved_session, last_session, PATH_MAX - 1) > 0) {
++                name = g_path_get_basename (last_session);
++        }
++
++        g_free (saved_session);
++
++        return name;
++}
++
++static char *
++get_selected_session (void)
++{
++        GtkTreeSelection *selection;
++        GtkTreeModel *model;
++        GtkTreeIter iter;
++        gchar *name;
++
++        selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (session_list));
++        if (gtk_tree_selection_get_selected (selection, &model, &iter)) {
++                gtk_tree_model_get (model, &iter, 0, &name, -1);
++                return name;
++        }
++
++        return NULL;
++}
++
++static void
++remove_session (const char *name)
++{
++        char *path1, *path2;
++        char *n, *path;
++        const char *d;
++        GDir *dir;
++        GError *error;
++
++        path1 = get_session_path ("saved-session");
++        path2 = get_session_path (name);
++
++        error = NULL;
++        n = g_file_read_link (path1, &error);
++        if (n == NULL) {
++                g_warning ("Failed to read link: %s", error->message);
++                g_error_free (error);
++        }
++        else if (strcmp (n, name) == 0) {
++                unlink (path1);
++        }
++        g_free (n);
++
++        dir = g_dir_open (path2, 0, NULL);
++        while ((d = g_dir_read_name (dir)) != NULL) {
++                path = g_build_filename (path2, d, NULL);
++                unlink (path);
++                g_free (path);
++        }
++        g_dir_close (dir);
++
++        remove (path2);
++
++        g_free (path1);
++        g_free (path2);
++}
++
++static void
++on_remove_session_clicked (GtkButton *button,
++                           gpointer   data)
++{
++        GtkTreeSelection *selection;
++        GtkTreeModel *model;
++        GtkTreeIter iter;
++        char *name;
++
++        selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (session_list));
++        if (gtk_tree_selection_get_selected (selection, &model, &iter)) {
++                GtkTreeIter child_iter;
++                gtk_tree_model_get (model, &iter, 0, &name, -1);
++                remove_session (name);
++                g_free (name);
++
++                gtk_tree_model_sort_convert_iter_to_child_iter (GTK_TREE_MODEL_SORT (model), &child_iter, &iter);
++                gtk_list_store_remove (GTK_LIST_STORE (store), &child_iter);
++
++                if (!gtk_tree_selection_get_selected (selection, NULL, NULL)) {
++                        gtk_tree_model_get_iter_first (model, &iter);
++                        gtk_tree_model_get (model, &iter, 0, &name, -1);
++                        select_session (name);
++                        g_free (name);
++                }
++        }
++}
++
++static void
++begin_rename (void)
++{
++        GtkTreePath *path;
++        GtkTreeViewColumn *column;
++        GList *cells;
++
++        gtk_widget_grab_focus (session_list);
++
++        gtk_tree_view_get_cursor (GTK_TREE_VIEW (session_list),
++                                  &path, &column);
++
++        cells = gtk_cell_layout_get_cells (GTK_CELL_LAYOUT (column));
++
++        if (cells != NULL) {
++            GtkCellRenderer *cell;
++
++            cell = (GtkCellRenderer *) cells->data;
++            g_list_free (cells);
++
++            g_object_set (cell, "editable", TRUE, NULL);
++            gtk_tree_view_set_cursor_on_cell (GTK_TREE_VIEW (session_list), path,
++                                              column, cell, TRUE);
++        }
++        gtk_tree_path_free (path);
++}
++
++static void
++on_rename_session_clicked (GtkButton *button,
++                           gpointer   data)
++{
++    begin_rename ();
++}
++
++static void
++on_continue_clicked (GtkButton *button,
++                     gpointer    data)
++{
++        gtk_main_quit ();
++}
++
++static void
++create_session (const char *name)
++{
++        char *path;
++        GtkTreeIter iter;
++
++        path = get_session_path (name);
++
++        if (mkdir (path, 0755) < 0) {
++                g_warning ("Failed to create directory %s", path);
++        }
++        else {
++                char *marker;
++
++                gtk_list_store_insert_with_values (store, &iter, 100, 0, name, -1);
++
++                marker = g_build_filename (path, ".new-session", NULL);
++                creat (marker, 0600);
++                g_free (marker);
++        }
++
++        g_free (path);
++}
++
++static gboolean
++make_session_current (const char *name)
++{
++        char *path1;
++        gboolean ret = TRUE;
++
++        path1 = g_build_filename (g_get_user_config_dir (), "gnome-session", "saved-session", NULL);
++
++        unlink (path1);
++        if (symlink (name, path1) < 0) {
++                g_warning ("Failed to make session '%s' current", name);
++                ret = FALSE;
++        }
++
++        g_free (path1);
++
++        return ret;
++}
++
++static gboolean
++rename_session (const char *old_name,
++                const char *new_name)
++{
++        char *old_path, *new_path;
++        int result;
++
++        if (g_strcmp0 (old_name, new_name) == 0) {
++                return TRUE;
++        }
++
++        if (!is_valid_session_name (new_name)) {
++               return FALSE;
++        }
++
++        old_path = get_session_path (old_name);
++        new_path = get_session_path (new_name);
++
++        result = g_rename (old_path, new_path);
++
++        if (result < 0) {
++                g_warning ("Failed to rename session from '%s' to '%s': %m", old_name, new_name);
++        } else {
++                char *last_session;
++
++                last_session = get_last_session ();
++
++                if (strcmp (old_name, last_session) == 0) {
++                        make_session_current (new_name);
++                }
++
++                g_free (last_session);
++        }
++
++        g_free (old_path);
++        g_free (new_path);
++
++        return result == 0;
++}
++
++static gboolean
++create_and_select_session (const char *name)
++{
++        gchar *path;
++
++        if (name[0] == 0 || name[0] == '.' || strchr (name, '/')) {
++                g_warning ("Invalid session name");
++                return FALSE;
++        }
++
++        path = g_build_filename (g_get_user_config_dir (), "gnome-session", name, NULL);
++        if (!g_file_test (path, G_FILE_TEST_IS_DIR)) {
++                if (mkdir (path, 0755) < 0) {
++                        g_warning ("Failed to create directory %s", path);
++                        g_free (path);
++                        return FALSE;
++                }
++        }
++
++        g_free (path);
++
++        return make_session_current (name);
++}
++
++static void
++select_session (const char *name)
++{
++        GtkTreeIter iter;
++        char *n;
++
++        /* now select it in the list */
++        gtk_tree_model_get_iter_first (GTK_TREE_MODEL (sort_model), &iter);
++        do {
++                gtk_tree_model_get (GTK_TREE_MODEL (sort_model), &iter, 0, &n, -1);
++                if (strcmp (n, name) == 0) {
++                        GtkTreePath *path;
++
++                        path = gtk_tree_model_get_path (GTK_TREE_MODEL (sort_model), &iter);
++                        gtk_tree_view_set_cursor (GTK_TREE_VIEW (session_list), path, NULL, FALSE);
++                        gtk_tree_path_free (path);
++                        g_free (n);
++                        break;
++                }
++                g_free (n);
++        } while (gtk_tree_model_iter_next (GTK_TREE_MODEL (sort_model), &iter));
++}
++
++static void
++on_new_session_clicked (GtkButton *button,
++                        gpointer   data)
++{
++        gchar *name;
++
++        name = find_new_session_name ();
++        create_session (name);
++        select_session (name);
++
++        begin_rename ();
++}
++
++static void
++on_selection_changed (GtkTreeSelection *selection,
++                      gpointer          data)
++{
++        char *name;
++
++        name = get_selected_session ();
++
++        if (name == NULL) {
++                return;
++        }
++
++        g_free (name);
++}
++
++static void
++update_remove_button (void)
++{
++        GtkWidget *button;
++
++        button = (GtkWidget *)gtk_builder_get_object (builder, "remove-session");
++        if (gtk_tree_model_iter_n_children (GTK_TREE_MODEL (store), NULL) > 1) {
++                gtk_widget_set_sensitive (button, TRUE);
++        } else {
++                gtk_widget_set_sensitive (button, FALSE);
++        }
++}
++
++static void
++on_row_edited (GtkCellRendererText *cell,
++               const char          *path_string,
++               const char          *new_name,
++               gpointer             data)
++{
++        GtkTreePath *path;
++        GtkTreeIter  sort_iter, items_iter;
++        char        *old_name;
++        gboolean     was_renamed;
++
++        path = gtk_tree_path_new_from_string (path_string);
++        gtk_tree_model_get_iter (GTK_TREE_MODEL (sort_model), &sort_iter, path);
++
++        gtk_tree_model_get (GTK_TREE_MODEL (sort_model), &sort_iter, 0, &old_name, -1);
++
++        was_renamed = rename_session (old_name, new_name);
++
++        if (was_renamed) {
++                gtk_tree_model_sort_convert_iter_to_child_iter (sort_model, &items_iter, &sort_iter);
++
++                gtk_list_store_set (store, &items_iter, 0, g_strdup (new_name), -1);
++                g_free (old_name);
++        } else {
++                begin_rename ();
++        }
++
++        gtk_tree_path_free (path);
++
++        g_object_set (cell, "editable", FALSE, NULL);
++}
++
++static void
++on_row_deleted (GtkTreeModel *model,
++                GtkTreePath  *path,
++                gpointer      data)
++{
++        update_remove_button ();
++}
++
++static void
++on_row_inserted (GtkTreeModel *model,
++                 GtkTreePath  *path,
++                 GtkTreeIter  *iter,
++                 gpointer      data)
++{
++        update_remove_button ();
++}
++
++static void
++on_row_activated (GtkTreeView       *tree_view,
++                  GtkTreePath       *path,
++                  GtkTreeViewColumn *column,
++                  gpointer           data)
++{
++        gtk_main_quit ();
++}
++
++static void
++auto_save_next_session (void)
++{
++        GConfClient *client;
++        GError *error;
++
++        client = gconf_client_get_default ();
++
++        error = NULL;
++        if (!gconf_client_set_bool (client,
++                                    KEY_AUTOSAVE_ONE_SHOT,
++                                    TRUE,
++                                    &error)) {
++        }
++        g_object_unref (client);
++}
++
++static void
++auto_save_next_session_if_needed (void)
++{
++        char *marker;
++
++        marker = g_build_filename (g_get_user_config_dir (),
++                                   "gnome-session", "saved-session",
++                                   ".new-session", NULL);
++
++        if (g_file_test (marker, G_FILE_TEST_EXISTS)) {
++                auto_save_next_session ();
++                unlink (marker);
++        }
++        g_free (marker);
++}
++
++static void
++save_session (void)
++{
++        DBusGConnection *conn;
++        DBusGProxy *proxy;
++        GError *error;
++
++        conn = dbus_g_bus_get (DBUS_BUS_SESSION, NULL);
++        if (conn == NULL) {
++                g_warning ("Could not connect to the session bus");
++                return;
++        }
++
++        proxy = dbus_g_proxy_new_for_name (conn, GSM_SERVICE_DBUS, GSM_PATH_DBUS, GSM_INTERFACE_DBUS);
++        if (proxy == NULL) {
++                g_warning ("Could not connect to the session manager");
++                return;
++        }
++
++        error = NULL;
++        if (!dbus_g_proxy_call (proxy, "SaveSession", &error, G_TYPE_INVALID, G_TYPE_INVALID)) {
++                g_warning ("Failed to save session: %s", error->message);
++                g_error_free (error);
++                return;
++        }
++
++        g_object_unref (proxy);
++}
++
++static int
++compare_sessions (GtkTreeModel *model,
++                  GtkTreeIter  *a,
++                  GtkTreeIter  *b,
++                  gpointer      data)
++{
++    char *name_a, *name_b;
++    int result;
++
++    gtk_tree_model_get (model, a, 0, &name_a, -1);
++    gtk_tree_model_get (model, b, 0, &name_b, -1);
++
++    result = g_utf8_collate (name_a, name_b);
++
++    g_free (name_a);
++    g_free (name_b);
++
++    return result;
++}
++
++static void
++on_map (GtkWidget *widget,
++        gpointer   data)
++{
++        gdk_window_focus (gtk_widget_get_window (widget), GDK_CURRENT_TIME);
++}
++
++int
++main (int argc, char *argv[])
++{
++        GtkWidget *window;
++        GtkWidget *widget;
++        GtkCellRenderer *cell;
++        GtkTreeViewColumn *column;
++        GtkTreeSelection *selection;
++        GError *error;
++        char *selected_session;
++
++        static char *action = NULL;
++        static char **remaining_args = NULL;
++        static GOptionEntry entries[] = {
++                {"action", '\0', 0, G_OPTION_ARG_STRING, &action, N_("What to do with session selection (save|load|print)"), NULL},
++{ G_OPTION_REMAINING, '\0', 0, G_OPTION_ARG_STRING_ARRAY, &remaining_args, N_("[session-name]"), NULL}
++        };
++
++        if (action == NULL) {
++            if (getenv ("SESSION_MANAGER") != NULL)
++                action = "print";
++            else
++                action = "load";
++        }
++
++        if (getenv ("SESSION_MANAGER") != NULL && strcmp (action, "load") == 0) {
++            g_warning ("Cannot load new session when session currently loaded");
++            return 1;
++        }
++
++        if (getenv ("SESSION_MANAGER") == NULL && strcmp (action, "save") == 0) {
++            g_warning ("Can only save session when session loaded");
++            return 1;
++        }
++
++        if (strcmp (action, "load") != 0 && strcmp (action, "save") != 0 && strcmp (action, "print") != 0) {
++            g_warning ("'%s' is not a supported action.  Supported actions are load, save, and print.\n", action);
++            return 1;
++        }
++
++        error = NULL;
++        gtk_init_with_args (&argc, &argv,
++                            NULL, entries, GETTEXT_PACKAGE, &error);
++
++        if (remaining_args != NULL) {
++                if (g_strv_length (remaining_args) > 1) {
++                        g_warning ("gnome-session-selector takes at most one session argument");
++                        return 1;
++                }
++
++                if (!create_and_select_session (remaining_args[0]))
++                        return 1;
++                else
++                        return 0;
++
++        }
++
++        builder = gtk_builder_new ();
++        gtk_builder_set_translation_domain (builder, GETTEXT_PACKAGE);
++
++        error = NULL;
++        if (!gtk_builder_add_from_file (builder, GTKBUILDER_DIR "/" "session-selector.ui",  &error)) {
++                g_warning ("Could not load file 'session-selector.ui': %s", error->message);
++                exit (1);
++        }
++
++        window = (GtkWidget *) gtk_builder_get_object (builder, "main-window");
++
++        store = (GtkListStore *) gtk_builder_get_object (builder, "session-store");
++        sort_model = (GtkTreeModelSort *) gtk_builder_get_object (builder, "sort-model");
++
++        gtk_tree_sortable_set_sort_func (GTK_TREE_SORTABLE (sort_model),
++                                         0, compare_sessions, NULL, NULL);
++        gtk_tree_sortable_set_sort_column_id (GTK_TREE_SORTABLE (sort_model),
++                                              0, GTK_SORT_ASCENDING);
++        g_signal_connect (store, "row-deleted", G_CALLBACK (on_row_deleted), NULL);
++        g_signal_connect (store, "row-inserted", G_CALLBACK (on_row_inserted), NULL);
++        session_list = (GtkWidget *) gtk_builder_get_object (builder, "session-list");
++
++        selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (session_list));
++        gtk_tree_selection_set_mode (selection, GTK_SELECTION_SINGLE);
++
++        populate_session_list (session_list);
++
++        cell = gtk_cell_renderer_text_new ();
++        g_signal_connect (cell, "edited", G_CALLBACK (on_row_edited), NULL);
++
++        column = gtk_tree_view_column_new_with_attributes ("", cell, "text", 0, NULL);
++        gtk_tree_view_append_column (GTK_TREE_VIEW (session_list), GTK_TREE_VIEW_COLUMN (column));
++
++        g_signal_connect (session_list, "row-activated", G_CALLBACK (on_row_activated), NULL);
++
++
++        g_signal_connect (selection, "changed",
++                          G_CALLBACK (on_selection_changed), NULL);
++
++        widget = (GtkWidget *) gtk_builder_get_object (builder, "new-session");
++        g_signal_connect (widget, "clicked", G_CALLBACK (on_new_session_clicked), NULL);
++        widget = (GtkWidget *) gtk_builder_get_object (builder, "remove-session");
++        g_signal_connect (widget, "clicked", G_CALLBACK (on_remove_session_clicked), NULL);
++        widget = (GtkWidget *) gtk_builder_get_object (builder, "rename-session");
++        g_signal_connect (widget, "clicked", G_CALLBACK (on_rename_session_clicked), NULL);
++        widget = (GtkWidget *) gtk_builder_get_object (builder, "continue-button");
++        g_signal_connect (widget, "clicked", G_CALLBACK (on_continue_clicked), NULL);
++
++        g_signal_connect (window, "map", G_CALLBACK (on_map), NULL);
++        gtk_widget_show (window);
++
++        gtk_main ();
++
++        selected_session = get_selected_session ();
++
++        if (g_strcmp0 (action, "load") == 0) {
++                make_session_current (selected_session);
++                auto_save_next_session_if_needed ();
++        } else if (g_strcmp0 (action, "save") == 0) {
++                char *last_session;
++
++                last_session = get_last_session ();
++                make_session_current (selected_session);
++                save_session ();
++                make_session_current (last_session);
++        } else if (g_strcmp0 (action, "print") == 0) {
++                g_print ("%s\n", selected_session);
++        }
++        g_free (selected_session);
++
++        return 0;
++}
+-- 
+1.7.1
+
+
+From e51c77b3191111f884ae72eb2d88e38af6f72d5a Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Mon, 25 Jul 2011 18:45:20 -0400
+Subject: [PATCH 6/7] Tie session selector to properties dialog
+
+---
+ capplet/gsm-properties-dialog.c |   30 +++++++++++++-
+ data/session-selector.ui        |    2 +-
+ tools/gnome-session-selector.c  |   80 ++++++++++++++++++++++++++-------------
+ 3 files changed, 82 insertions(+), 30 deletions(-)
+
+diff --git a/capplet/gsm-properties-dialog.c b/capplet/gsm-properties-dialog.c
+index f54656e..1c9b64b 100644
+--- a/capplet/gsm-properties-dialog.c
++++ b/capplet/gsm-properties-dialog.c
+@@ -533,8 +533,7 @@ session_saved_cb (DBusGProxy *proxy,
+ }
+ 
+ static void
+-on_save_session_clicked (GtkWidget           *widget,
+-                         GsmPropertiesDialog *dialog)
++save_session_directly (GsmPropertiesDialog *dialog)
+ {
+         DBusGConnection *conn;
+         DBusGProxy *proxy;
+@@ -561,6 +560,33 @@ on_save_session_clicked (GtkWidget           *widget,
+ }
+ 
+ static void
++save_session_from_selector (GsmPropertiesDialog *dialog,
++                            const char          *program_path)
++{
++        char *command_line = g_strdup_printf ("%s --action save", program_path);
++
++        g_spawn_command_line_sync (command_line, NULL, NULL, NULL, NULL);
++
++        g_free (command_line);
++}
++
++static void
++on_save_session_clicked (GtkWidget           *widget,
++                         GsmPropertiesDialog *dialog)
++{
++        char *program_path;
++
++        program_path = g_find_program_in_path ("gnome-session-selector");
++
++        if (program_path != NULL) {
++                save_session_from_selector (dialog, program_path);
++                g_free (program_path);
++        } else {
++                save_session_directly (dialog);
++        }
++}
++
++static void
+ setup_dialog (GsmPropertiesDialog *dialog)
+ {
+         GtkTreeView       *treeview;
+diff --git a/data/session-selector.ui b/data/session-selector.ui
+index 1c55712..1534a74 100644
+--- a/data/session-selector.ui
++++ b/data/session-selector.ui
+@@ -47,7 +47,7 @@
+                             <property name="visible">True</property>
+                             <property name="xalign">0.0</property>
+                             <property name="yalign">0.5</property>
+-                            <property name="label" translatable="yes">Please select a custom session to run</property>
++                            <property name="label" translatable="yes">Please select a custom session to use</property>
+                           </object>
+                           <packing>
+                             <property name="expand">True</property>
+diff --git a/tools/gnome-session-selector.c b/tools/gnome-session-selector.c
+index 6d1e062..6b8379c 100644
+--- a/tools/gnome-session-selector.c
++++ b/tools/gnome-session-selector.c
+@@ -49,6 +49,7 @@ static GtkBuilder *builder;
+ static GtkWidget *session_list;
+ static GtkListStore *store;
+ static GtkTreeModelSort *sort_model;
++static char *info_text;
+ 
+ static void select_session (const char *name);
+ 
+@@ -84,7 +85,6 @@ is_valid_session_name (const char *name)
+ {
+         GtkTreeIter iter;
+         char *n;
+-        const char *info_text;
+         char *warning_text;
+         gboolean user_tried_dot;
+         gboolean user_tried_slash;
+@@ -107,7 +107,6 @@ is_valid_session_name (const char *name)
+             user_tried_slash = FALSE;
+         }
+ 
+-        info_text = _("Please select a custom session to run");
+         warning_text = NULL;
+         if (user_tried_dot && user_tried_slash) {
+             warning_text = g_strdup_printf ("%s\n<small><b>Note:</b> <i>%s</i></small>",
+@@ -288,6 +287,25 @@ remove_session (const char *name)
+         g_free (path2);
+ }
+ 
++static gboolean
++make_session_current (const char *name)
++{
++        char *path1;
++        gboolean ret = TRUE;
++
++        path1 = g_build_filename (g_get_user_config_dir (), "gnome-session", "saved-session", NULL);
++
++        unlink (path1);
++        if (symlink (name, path1) < 0) {
++                g_warning ("Failed to make session '%s' current", name);
++                ret = FALSE;
++        }
++
++        g_free (path1);
++
++        return ret;
++}
++
+ static void
+ on_remove_session_clicked (GtkButton *button,
+                            gpointer   data)
+@@ -311,6 +329,7 @@ on_remove_session_clicked (GtkButton *button,
+                         gtk_tree_model_get_iter_first (model, &iter);
+                         gtk_tree_model_get (model, &iter, 0, &name, -1);
+                         select_session (name);
++			make_session_current (name);
+                         g_free (name);
+                 }
+         }
+@@ -365,7 +384,7 @@ create_session (const char *name)
+ 
+         path = get_session_path (name);
+ 
+-        if (mkdir (path, 0755) < 0) {
++        if (g_mkdir_with_parents (path, 0755) < 0) {
+                 g_warning ("Failed to create directory %s", path);
+         }
+         else {
+@@ -382,25 +401,6 @@ create_session (const char *name)
+ }
+ 
+ static gboolean
+-make_session_current (const char *name)
+-{
+-        char *path1;
+-        gboolean ret = TRUE;
+-
+-        path1 = g_build_filename (g_get_user_config_dir (), "gnome-session", "saved-session", NULL);
+-
+-        unlink (path1);
+-        if (symlink (name, path1) < 0) {
+-                g_warning ("Failed to make session '%s' current", name);
+-                ret = FALSE;
+-        }
+-
+-        g_free (path1);
+-
+-        return ret;
+-}
+-
+-static gboolean
+ rename_session (const char *old_name,
+                 const char *new_name)
+ {
+@@ -452,7 +452,7 @@ create_and_select_session (const char *name)
+ 
+         path = g_build_filename (g_get_user_config_dir (), "gnome-session", name, NULL);
+         if (!g_file_test (path, G_FILE_TEST_IS_DIR)) {
+-                if (mkdir (path, 0755) < 0) {
++                if (g_mkdir_with_parents (path, 0755) < 0) {
+                         g_warning ("Failed to create directory %s", path);
+                         g_free (path);
+                         return FALSE;
+@@ -488,8 +488,7 @@ select_session (const char *name)
+ }
+ 
+ static void
+-on_new_session_clicked (GtkButton *button,
+-                        gpointer   data)
++create_session_and_begin_rename (void)
+ {
+         gchar *name;
+ 
+@@ -501,6 +500,13 @@ on_new_session_clicked (GtkButton *button,
+ }
+ 
+ static void
++on_new_session_clicked (GtkButton *button,
++                        gpointer   data)
++{
++	create_session_and_begin_rename ();
++}
++
++static void
+ on_selection_changed (GtkTreeSelection *selection,
+                       gpointer          data)
+ {
+@@ -680,6 +686,7 @@ main (int argc, char *argv[])
+ {
+         GtkWidget *window;
+         GtkWidget *widget;
++        GtkWidget *label;
+         GtkCellRenderer *cell;
+         GtkTreeViewColumn *column;
+         GtkTreeSelection *selection;
+@@ -767,7 +774,6 @@ main (int argc, char *argv[])
+ 
+         g_signal_connect (session_list, "row-activated", G_CALLBACK (on_row_activated), NULL);
+ 
+-
+         g_signal_connect (selection, "changed",
+                           G_CALLBACK (on_selection_changed), NULL);
+ 
+@@ -783,6 +789,25 @@ main (int argc, char *argv[])
+         g_signal_connect (window, "map", G_CALLBACK (on_map), NULL);
+         gtk_widget_show (window);
+ 
++        if (g_strcmp0 (action, "load") == 0) {
++		info_text = _("Please select a custom session to run");
++	} else if (g_strcmp0 (action, "print") == 0) {
++		info_text = _("Please select a session to use");
++        } else if (g_strcmp0 (action, "save") == 0) {
++		info_text = _("Please select a session to save to");
++        }
++
++        label = (GtkWidget*) gtk_builder_get_object (builder, "info-label");
++        gtk_label_set_markup (GTK_LABEL (label), info_text);
++
++        selected_session = get_selected_session ();
++
++        if (selected_session == NULL) {
++		create_session_and_begin_rename ();
++	} else {
++		g_free (selected_session);
++        }
++
+         gtk_main ();
+ 
+         selected_session = get_selected_session ();
+@@ -796,7 +821,8 @@ main (int argc, char *argv[])
+                 last_session = get_last_session ();
+                 make_session_current (selected_session);
+                 save_session ();
+-                make_session_current (last_session);
++                if (last_session != NULL)
++                    make_session_current (last_session);
+         } else if (g_strcmp0 (action, "print") == 0) {
+                 g_print ("%s\n", selected_session);
+         }
+-- 
+1.7.1
+
+
+From fdea0a8d7edb0601d922df3f39f234348f8dd2bb Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Mon, 25 Jul 2011 19:10:12 -0400
+Subject: [PATCH 7/7] make save-session stall until it finishes
+
+---
+ gnome-session/gsm-manager.c                |   60 ++++++++++++++++++++++++---
+ gnome-session/gsm-manager.h                |    2 +-
+ gnome-session/org.gnome.SessionManager.xml |    1 +
+ 3 files changed, 55 insertions(+), 8 deletions(-)
+
+diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
+index 2fec451..883e55c 100644
+--- a/gnome-session/gsm-manager.c
++++ b/gnome-session/gsm-manager.c
+@@ -134,6 +134,7 @@ struct GsmManagerPrivate
+          * since it uses a sublist of all running client that replied in a
+          * specific way */
+         GSList                 *next_query_clients;
++        GSList                 *pending_save_invocations;
+         /* This is the action that will be done just before we exit */
+         GsmManagerLogoutType    logout_type;
+ 
+@@ -1226,6 +1227,37 @@ _client_request_save_helper (const char           *id,
+ }
+ 
+ static void
++fail_pending_save_invocations (GsmManager *manager,
++                               GError     *error)
++{
++        GSList *l;
++
++        for (l = manager->priv->pending_save_invocations; l != NULL; l = l->next) {
++                DBusGMethodInvocation *context = l->data;
++
++                dbus_g_method_return_error (context, error);
++        }
++
++        g_slist_free (manager->priv->pending_save_invocations);
++        manager->priv->pending_save_invocations = NULL;
++}
++
++static void
++finish_pending_save_invocations (GsmManager *manager)
++{
++        GSList *l;
++
++        for (l = manager->priv->pending_save_invocations; l != NULL; l = l->next) {
++                DBusGMethodInvocation *context = l->data;
++
++                dbus_g_method_return (context);
++        }
++
++        g_slist_free (manager->priv->pending_save_invocations);
++        manager->priv->pending_save_invocations = NULL;
++}
++
++static void
+ query_save_session_complete (GsmManager *manager)
+ {
+         GError *error = NULL;
+@@ -1255,7 +1287,10 @@ query_save_session_complete (GsmManager *manager)
+ 
+         if (error) {
+                 g_warning ("Error saving session: %s", error->message);
++                fail_pending_save_invocations (manager, error);
+                 g_error_free (error);
++        } else {
++                finish_pending_save_invocations (manager);
+         }
+ }
+ 
+@@ -2975,6 +3010,8 @@ gsm_manager_init (GsmManager *manager)
+ 
+         load_idle_delay_from_gconf (manager);
+         load_max_idle_from_gconf (manager);
++
++        manager->priv->pending_save_invocations = NULL;
+ }
+ 
+ static void
+@@ -3456,20 +3493,22 @@ gsm_manager_shutdown (GsmManager *manager,
+ }
+ 
+ gboolean
+-gsm_manager_save_session (GsmManager *manager,
+-                          GError     **error)
++gsm_manager_save_session (GsmManager            *manager,
++                          DBusGMethodInvocation *context)
+ {
+         ClientEndSessionData data;
++        GError *error;
+ 
+         g_debug ("GsmManager: SaveSession called");
+ 
+         g_return_val_if_fail (GSM_IS_MANAGER (manager), FALSE);
+ 
+         if (manager->priv->phase != GSM_MANAGER_PHASE_RUNNING) {
+-                g_set_error (error,
+-                             GSM_MANAGER_ERROR,
+-                             GSM_MANAGER_ERROR_NOT_IN_RUNNING,
+-                             "SaveSession interface is only available during the Running phase");
++                error = g_error_new (GSM_MANAGER_ERROR,
++                                     GSM_MANAGER_ERROR_NOT_IN_RUNNING,
++                                     "SaveSession interface is only available during the Running phase");
++                dbus_g_method_return_error (context, error);
++                g_error_free (error);
+                 return FALSE;
+         }
+ 
+@@ -3483,11 +3522,18 @@ gsm_manager_save_session (GsmManager *manager,
+                 manager->priv->query_timeout_id = g_timeout_add_seconds (GSM_MANAGER_SAVE_SESSION_TIMEOUT,
+                                                                          (GSourceFunc)_on_query_save_session_timeout,
+                                                                          manager);
++
++		manager->priv->pending_save_invocations = g_slist_prepend (manager->priv->pending_save_invocations,
++									   context);
++
+                 return TRUE;
+         } else {
+                 g_debug ("GsmManager: Nothing to save");
+-                return FALSE;
++                dbus_g_method_return (context);
++                return TRUE;
+         }
++
++        return TRUE;
+ }
+ 
+ gboolean
+diff --git a/gnome-session/gsm-manager.h b/gnome-session/gsm-manager.h
+index dd6f198..77a937d 100644
+--- a/gnome-session/gsm-manager.h
++++ b/gnome-session/gsm-manager.h
+@@ -153,7 +153,7 @@ gboolean            gsm_manager_shutdown                       (GsmManager     *
+                                                                 GError        **error);
+ 
+ gboolean            gsm_manager_save_session                   (GsmManager     *manager,
+-                                                                GError        **error);
++								DBusGMethodInvocation *context);
+ 
+ gboolean            gsm_manager_can_shutdown                   (GsmManager     *manager,
+                                                                 gboolean       *shutdown_available,
+diff --git a/gnome-session/org.gnome.SessionManager.xml b/gnome-session/org.gnome.SessionManager.xml
+index bece3f5..954115c 100644
+--- a/gnome-session/org.gnome.SessionManager.xml
++++ b/gnome-session/org.gnome.SessionManager.xml
+@@ -257,6 +257,7 @@
+     </method>
+ 
+     <method name="SaveSession">
++      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+       <doc:doc>
+ 	<doc:description>
+ 	  <doc:para>Request to save session</doc:para>
+-- 
+1.7.1
+
