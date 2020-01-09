@@ -1,0 +1,31 @@
+--- gnome-session-2.28.0.orig/gnome-session/gsm-logout-dialog.c 2011-03-07 20:03:32.980834984 +0530
++++ gnome-session-2.28.0.orig/gnome-session/gsm-logout-dialog.c 2011-03-07 20:04:51.854833936 +0530
+@@ -26,6 +26,7 @@ 
+ 
+ #include <glib/gi18n.h>
+ #include <gtk/gtk.h>
++#include <gconf/gconf-client.h>
+ 
+ #include <devkit-power-gobject/devicekit-power.h>
+ 
+@@ -203,9 +204,19 @@ static gboolean
+ gsm_logout_supports_switch_user (GsmLogoutDialog *logout_dialog)
+ {
+         gboolean ret;
++       GConfClient *client;
++       gboolean disable_user_switching;
+ 
+         ret = gsm_consolekit_can_switch_user (logout_dialog->priv->consolekit);
+ 
++       client = gconf_client_get_default ();
++       disable_user_switching = gconf_client_get_bool (client,
++                                                       "/desktop/gnome/lockdown/disable_user_switching",
++                                                       NULL);
++
++       if (disable_user_switching)
++               ret = FALSE;
++
+         return ret;
+ }
+ 
+

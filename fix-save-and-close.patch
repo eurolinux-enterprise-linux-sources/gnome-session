@@ -1,0 +1,54 @@
+From 6b1ac04bdb4030c232b19c8fa435866461e504fa Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Sun, 22 Jun 2014 14:48:13 -0400
+Subject: [PATCH] capplet: destroy dialog on shutdown
+
+The dialog was never getting explicitly disposed,
+so it never processed pending queued save operations
+on exit.
+---
+ capplet/main.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/capplet/main.c b/capplet/main.c
+index c8829a0..cc8a31e 100644
+--- a/capplet/main.c
++++ b/capplet/main.c
+@@ -78,32 +78,34 @@ int
+ main (int argc, char *argv[])
+ {
+         GError    *error;
+         GtkWidget *dialog;
+ 
+         bindtextdomain (GETTEXT_PACKAGE, LOCALE_DIR);
+         bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
+         textdomain (GETTEXT_PACKAGE);
+ 
+         error = NULL;
+         if (! gtk_init_with_args (&argc, &argv, " - GNOME Session Properties", options, GETTEXT_PACKAGE, &error)) {
+                 g_warning ("Unable to start: %s", error->message);
+                 g_error_free (error);
+                 return 1;
+         }
+ 
+         if (show_version) {
+                 g_print ("%s %s\n", argv [0], VERSION);
+                 return 0;
+         }
+ 
+         dialog = gsm_properties_dialog_new ();
+         g_signal_connect (dialog,
+                           "response",
+                           G_CALLBACK (dialog_response),
+                           NULL);
+         gtk_widget_show (dialog);
+ 
+         gtk_main ();
+ 
++        gtk_widget_destroy (dialog);
++
+         return 0;
+ }
+-- 
+1.9.3
+

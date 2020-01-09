@@ -1,0 +1,314 @@
+From 44e0a77ac70715acb3f75a988750d451556b0196 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Sun, 22 Jun 2014 16:42:18 -0400
+Subject: [PATCH] session-selector: add close button
+
+If the user clicks save in their session and then changes their mind,
+they're kind of out of luck.
+
+This commit adds a close button so they can abort mission if necessary.
+---
+ data/session-selector.ui       | 16 +++++++++++++++-
+ tools/gnome-session-selector.c | 17 ++++++++++++++++-
+ 2 files changed, 31 insertions(+), 2 deletions(-)
+
+diff --git a/data/session-selector.ui b/data/session-selector.ui
+index 1534a74..64a5e59 100644
+--- a/data/session-selector.ui
++++ b/data/session-selector.ui
+@@ -137,59 +137,73 @@
+                                 <property name="use_underline">True</property>
+                               </object>
+                               <packing>
+                                 <property name="expand">False</property>
+                                 <property name="fill">False</property>
+                                 <property name="position">2</property>
+                               </packing>
+                             </child>
+                           </object>
+                           <packing>
+                             <property name="expand">False</property>
+                             <property name="position">1</property>
+                           </packing>
+                         </child>
+                       </object>
+                       <packing>
+                         <property name="position">1</property>
+                       </packing>
+                     </child>
+                   </object>
+                   <packing>
+                     <property name="position">1</property>
+                   </packing>
+                 </child>
+                 <child>
+                   <object class="GtkHButtonBox" id="hbuttonbox2">
+                     <property name="visible">True</property>
+                     <property name="spacing">6</property>
+                     <property name="layout_style">end</property>
+                     <child>
++                      <object class="GtkButton" id="close-button">
++                        <property name="label">gtk-close</property>
++                        <property name="visible">True</property>
++                        <property name="can_focus">True</property>
++                        <property name="receives_default">True</property>
++                        <property name="use_stock">True</property>
++                      </object>
++                      <packing>
++                        <property name="expand">False</property>
++                        <property name="fill">False</property>
++                        <property name="position">0</property>
++                      </packing>
++                    </child>
++                    <child>
+                       <object class="GtkButton" id="continue-button">
+                         <property name="label" translatable="yes">_Continue</property>
+                         <property name="visible">True</property>
+                         <property name="can_focus">True</property>
+                         <property name="can_default">True</property>
+                         <property name="has_default">True</property>
+                         <property name="receives_default">True</property>
+                         <property name="use_underline">True</property>
+                       </object>
+                       <packing>
+                         <property name="expand">False</property>
+                         <property name="fill">False</property>
+-                        <property name="position">0</property>
++                        <property name="position">1</property>
+                       </packing>
+                     </child>
+                   </object>
+                   <packing>
+                     <property name="expand">False</property>
+                     <property name="position">2</property>
+                   </packing>
+                 </child>
+               </object>
+             </child>
+           </object>
+         </child>
+       </object>
+     </child>
+   </object>
+ </interface>
+diff --git a/tools/gnome-session-selector.c b/tools/gnome-session-selector.c
+index 6b8379c..bcea765 100644
+--- a/tools/gnome-session-selector.c
++++ b/tools/gnome-session-selector.c
+@@ -23,60 +23,61 @@
+ 
+ #include <fcntl.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <unistd.h>
+ 
+ #include <glib.h>
+ #include <gtk/gtk.h>
+ #include <gconf/gconf-client.h>
+ 
+ #include <glib/gi18n.h>
+ #include <glib/gstdio.h>
+ 
+ #include <dbus/dbus-glib.h>
+ #include <dbus/dbus-glib-lowlevel.h>
+ 
+ #define GSM_SERVICE_DBUS   "org.gnome.SessionManager"
+ #define GSM_PATH_DBUS      "/org/gnome/SessionManager"
+ #define GSM_INTERFACE_DBUS "org.gnome.SessionManager"
+ 
+ #define KEY_GNOME_SESSION_DIR     "/apps/gnome-session/options"
+ #define KEY_AUTOSAVE_ONE_SHOT     KEY_GNOME_SESSION_DIR "/auto_save_session_one_shot"
+ 
+ static GtkBuilder *builder;
+ static GtkWidget *session_list;
+ static GtkListStore *store;
+ static GtkTreeModelSort *sort_model;
+ static char *info_text;
++static gboolean canceled;
+ 
+ static void select_session (const char *name);
+ 
+ static char *
+ get_session_path (const char *name)
+ {
+         return g_build_filename (g_get_user_config_dir (), "gnome-session", name, NULL);
+ }
+ 
+ static char *
+ find_new_session_name (void)
+ {
+         char *name;
+         char *path;
+         int i;
+ 
+         for (i = 1; i < 20; i++) {
+                 name = g_strdup_printf (_("Session %d"), i);
+                 path = get_session_path (name);
+                 if (!g_file_test (path, G_FILE_TEST_EXISTS)) {
+                         g_free (path);
+                         return name;
+                 }
+                 g_free (path);
+                 g_free (name);
+         }
+ 
+         return NULL;
+ }
+ 
+@@ -350,60 +351,68 @@ begin_rename (void)
+         cells = gtk_cell_layout_get_cells (GTK_CELL_LAYOUT (column));
+ 
+         if (cells != NULL) {
+             GtkCellRenderer *cell;
+ 
+             cell = (GtkCellRenderer *) cells->data;
+             g_list_free (cells);
+ 
+             g_object_set (cell, "editable", TRUE, NULL);
+             gtk_tree_view_set_cursor_on_cell (GTK_TREE_VIEW (session_list), path,
+                                               column, cell, TRUE);
+         }
+         gtk_tree_path_free (path);
+ }
+ 
+ static void
+ on_rename_session_clicked (GtkButton *button,
+                            gpointer   data)
+ {
+     begin_rename ();
+ }
+ 
+ static void
+ on_continue_clicked (GtkButton *button,
+                      gpointer    data)
+ {
+         gtk_main_quit ();
+ }
+ 
+ static void
++on_close_clicked (GtkButton *button,
++                  gpointer    data)
++{
++        canceled = TRUE;
++        gtk_main_quit ();
++}
++
++static void
+ create_session (const char *name)
+ {
+         char *path;
+         GtkTreeIter iter;
+ 
+         path = get_session_path (name);
+ 
+         if (g_mkdir_with_parents (path, 0755) < 0) {
+                 g_warning ("Failed to create directory %s", path);
+         }
+         else {
+                 char *marker;
+ 
+                 gtk_list_store_insert_with_values (store, &iter, 100, 0, name, -1);
+ 
+                 marker = g_build_filename (path, ".new-session", NULL);
+                 creat (marker, 0600);
+                 g_free (marker);
+         }
+ 
+         g_free (path);
+ }
+ 
+ static gboolean
+ rename_session (const char *old_name,
+                 const char *new_name)
+ {
+         char *old_path, *new_path;
+         int result;
+ 
+@@ -758,75 +767,81 @@ main (int argc, char *argv[])
+         gtk_tree_sortable_set_sort_column_id (GTK_TREE_SORTABLE (sort_model),
+                                               0, GTK_SORT_ASCENDING);
+         g_signal_connect (store, "row-deleted", G_CALLBACK (on_row_deleted), NULL);
+         g_signal_connect (store, "row-inserted", G_CALLBACK (on_row_inserted), NULL);
+         session_list = (GtkWidget *) gtk_builder_get_object (builder, "session-list");
+ 
+         selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (session_list));
+         gtk_tree_selection_set_mode (selection, GTK_SELECTION_SINGLE);
+ 
+         populate_session_list (session_list);
+ 
+         cell = gtk_cell_renderer_text_new ();
+         g_signal_connect (cell, "edited", G_CALLBACK (on_row_edited), NULL);
+ 
+         column = gtk_tree_view_column_new_with_attributes ("", cell, "text", 0, NULL);
+         gtk_tree_view_append_column (GTK_TREE_VIEW (session_list), GTK_TREE_VIEW_COLUMN (column));
+ 
+         g_signal_connect (session_list, "row-activated", G_CALLBACK (on_row_activated), NULL);
+ 
+         g_signal_connect (selection, "changed",
+                           G_CALLBACK (on_selection_changed), NULL);
+ 
+         widget = (GtkWidget *) gtk_builder_get_object (builder, "new-session");
+         g_signal_connect (widget, "clicked", G_CALLBACK (on_new_session_clicked), NULL);
+         widget = (GtkWidget *) gtk_builder_get_object (builder, "remove-session");
+         g_signal_connect (widget, "clicked", G_CALLBACK (on_remove_session_clicked), NULL);
+         widget = (GtkWidget *) gtk_builder_get_object (builder, "rename-session");
+         g_signal_connect (widget, "clicked", G_CALLBACK (on_rename_session_clicked), NULL);
+         widget = (GtkWidget *) gtk_builder_get_object (builder, "continue-button");
+         g_signal_connect (widget, "clicked", G_CALLBACK (on_continue_clicked), NULL);
++        widget = (GtkWidget *) gtk_builder_get_object (builder, "close-button");
++        if (g_strcmp0 (action, "save") == 0) {
++                g_signal_connect (widget, "clicked", G_CALLBACK (on_close_clicked), NULL);
++        } else {
++                gtk_widget_hide (widget);
++        }
+ 
+         g_signal_connect (window, "map", G_CALLBACK (on_map), NULL);
+         gtk_widget_show (window);
+ 
+         if (g_strcmp0 (action, "load") == 0) {
+ 		info_text = _("Please select a custom session to run");
+ 	} else if (g_strcmp0 (action, "print") == 0) {
+ 		info_text = _("Please select a session to use");
+         } else if (g_strcmp0 (action, "save") == 0) {
+ 		info_text = _("Please select a session to save to");
+         }
+ 
+         label = (GtkWidget*) gtk_builder_get_object (builder, "info-label");
+         gtk_label_set_markup (GTK_LABEL (label), info_text);
+ 
+         selected_session = get_selected_session ();
+ 
+         if (selected_session == NULL) {
+ 		create_session_and_begin_rename ();
+ 	} else {
+ 		g_free (selected_session);
+         }
+ 
+         gtk_main ();
+ 
+         selected_session = get_selected_session ();
+ 
+         if (g_strcmp0 (action, "load") == 0) {
+                 make_session_current (selected_session);
+                 auto_save_next_session_if_needed ();
+-        } else if (g_strcmp0 (action, "save") == 0) {
++        } else if (g_strcmp0 (action, "save") == 0 && !canceled) {
+                 char *last_session;
+ 
+                 last_session = get_last_session ();
+                 make_session_current (selected_session);
+                 save_session ();
+                 if (last_session != NULL)
+                     make_session_current (last_session);
+         } else if (g_strcmp0 (action, "print") == 0) {
+                 g_print ("%s\n", selected_session);
+         }
+         g_free (selected_session);
+ 
+         return 0;
+ }
+-- 
+1.9.3
+

@@ -1,0 +1,87 @@
+From 5a85380b475602bf5e89f4714a9a729cd4dff190 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Sun, 22 Jun 2014 18:02:20 -0400
+Subject: [PATCH] main: bail if session manager already running
+
+gnome-session used to check if there was a session manager already and
+bail.  That got lost at some point.
+
+This commit brings it back.
+---
+ gnome-session/main.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/gnome-session/main.c b/gnome-session/main.c
+index 90e0dce..27fc39a 100644
+--- a/gnome-session/main.c
++++ b/gnome-session/main.c
+@@ -412,60 +412,66 @@ require_dbus_session (int      argc,
+                              "No session bus and could not exec dbus-launch: %s",
+                              g_strerror (errno));
+                 return FALSE;
+         }
+ 
+         /* Should not be reached */
+         return TRUE;
+ }
+ 
+ int
+ main (int argc, char **argv)
+ {
+         struct sigaction  sa;
+         GError           *error;
+         char             *display_str;
+         GsmManager       *manager;
+         GsmStore         *client_store;
+         GsmXsmpServer    *xsmp_server;
+         GdmSignalHandler *signal_handler;
+         static char     **override_autostart_dirs = NULL;
+         static char      *default_session_key = NULL;
+         static GOptionEntry entries[] = {
+                 { "autostart", 'a', 0, G_OPTION_ARG_STRING_ARRAY, &override_autostart_dirs, N_("Override standard autostart directories"), NULL },
+                 { "default-session-key", 0, 0, G_OPTION_ARG_STRING, &default_session_key, N_("GConf key used to lookup default session"), NULL },
+                 { "debug", 0, 0, G_OPTION_ARG_NONE, &debug, N_("Enable debugging code"), NULL },
+                 { "failsafe", 'f', 0, G_OPTION_ARG_NONE, &failsafe, N_("Do not load user-specified applications"), NULL },
+                 { "version", 0, 0, G_OPTION_ARG_NONE, &show_version, N_("Version of this application"), NULL },
+                 { NULL, 0, 0, 0, NULL, NULL, NULL }
+         };
+ 
++        /* Make sure we aren't getting run from within a session */
++        if (g_getenv ("SESSION_MANAGER") != NULL) {
++                fprintf (stderr, "gnome-session: you're already running a session manager\n");
++                exit (1);
++        }
++
+         /* Make sure that we have a session bus */
+         if (!require_dbus_session (argc, argv, &error)) {
+                 gsm_util_init_error (TRUE, "%s", error->message);
+         }
+ 
+         bindtextdomain (GETTEXT_PACKAGE, LOCALE_DIR);
+         bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
+         textdomain (GETTEXT_PACKAGE);
+ 
+         sa.sa_handler = SIG_IGN;
+         sa.sa_flags = 0;
+         sigemptyset (&sa.sa_mask);
+         sigaction (SIGPIPE, &sa, 0);
+ 
+         error = NULL;
+         gtk_init_with_args (&argc, &argv,
+                             (char *) _(" - the GNOME session manager"),
+                             entries, GETTEXT_PACKAGE,
+                             &error);
+         if (error != NULL) {
+                 g_warning ("%s", error->message);
+                 exit (1);
+         }
+ 
+         if (show_version) {
+                 g_print ("%s %s\n", argv [0], VERSION);
+                 exit (1);
+         }
+ 
+         notify_init ("GNOME session manager");
+-- 
+1.9.3
+

@@ -10,7 +10,7 @@
 Summary: GNOME session manager
 Name: gnome-session
 Version: 2.28.0
-Release: 18%{?dist}
+Release: 22%{?dist}
 URL: http://www.gnome.org
 Source0: http://download.gnome.org/sources/gnome-session/2.28/%{name}-%{version}.tar.bz2
 # latest upstream translations
@@ -100,6 +100,18 @@ Patch8: fix-up-man-page.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=573024
 Patch9: drop-no-description.patch
 
+# https://bugzilla.redhat.com/show_bug.cgi?id=684767
+Patch10: user-switching-lockdown.patch
+
+# https://bugzilla.redhat.com/show_bug.cgi?id=785828
+Patch11: fix-save-and-close.patch
+
+# https://bugzilla.redhat.com/show_bug.cgi?id=786573
+Patch12: add-close-button.patch
+
+# https://bugzilla.redhat.com/show_bug.cgi?id=982423
+Patch13: check-for-sm.patch
+
 %description
 gnome-session manages a GNOME desktop or GDM login session. It starts up
 the other core GNOME components and handles logout and saving the session.
@@ -139,6 +151,10 @@ cp %{SOURCE3} po
 %patch7 -p1 -b .translations
 %patch8 -p1 -b .fix-up-man-page
 %patch9 -p1 -b .drop-no-description
+%patch10 -p1 -b .user-switching-lockdown
+%patch11 -p1 -b .fix-save-and-close
+%patch12 -p1 -b .add-close-button
+%patch13 -p1 -b .check-for-sm
 
 %build
 
@@ -232,6 +248,22 @@ fi
 %{_sysconfdir}/xdg/autostart/gnome-settings-daemon-helper.desktop
 
 %changelog
+* Sun Jun 22 2014 Ray Strode <rstrode@redhat.com> 2.28.0-22
+- Don't start session manager if it's already running
+  Resolves: #982423
+
+* Sun Jun 22 2014 Ray Strode <rstrode@redhat.com> 2.28.0-21
+- Add a close button in the session selector save dialog, to
+  provide a way to close the dialog without saving.
+  Resolves: #786573
+
+* Sun Jun 22 2014 Ray Strode <rstrode@redhat.com> 2.28.0-20
+- Ensure changes are committed when exiting
+  Resolves: #785828
+
+* Fri Jun 20 2014 Ray Strode <rstrode@redhat.com> 2.28.0-19
+- Honor user switching lockdown gconf key
+
 * Tue Aug 09 2011 Ray Strode <rstrode@redhat.com> 2.28.0-18
 - More symlink handling fixes
   Related: #622849
