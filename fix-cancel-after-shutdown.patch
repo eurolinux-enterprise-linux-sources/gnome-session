@@ -1,0 +1,687 @@
+From bb390eaa549cc2576ebc759450cb94516bf12385 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Mon, 7 Nov 2016 11:02:34 -0500
+Subject: [PATCH] consolekit: prompt for password first before starting
+ reboot/shutdown
+
+Sometimes when user requests to reboot or shutdown the machine, we
+need to prompt for a password (say if another user is already logged
+in). Unfortunately we do this at the end of logout process, so if the
+user clicks cancel they still get logged out.
+
+This commit moves the password prompting to the front end of the
+process, so a cancel cancels both the shutdown and implicit logout
+operation.
+---
+ configure.in                   |  16 +++++
+ gnome-session/Makefile.am      |   2 +
+ gnome-session/gsm-consolekit.c | 144 ++++++++++++++++++++++++++++++++++++++---
+ gnome-session/gsm-consolekit.h |   1 +
+ 4 files changed, 154 insertions(+), 9 deletions(-)
+
+diff --git a/configure.in b/configure.in
+index e74053a..e3fa5ab 100644
+--- a/configure.in
++++ b/configure.in
+@@ -14,117 +14,133 @@ GNOME_DEBUG_CHECK
+ 
+ IT_PROG_INTLTOOL([0.40.0])
+ 
+ AC_ISC_POSIX
+ AC_PROG_CC
+ AC_STDC_HEADERS
+ AM_PROG_LIBTOOL
+ AC_PATH_PROG(GLIB_GENMARSHAL, glib-genmarshal)
+ 
+ dnl make sure we keep ACLOCAL_FLAGS around for maintainer builds to work
+ AC_SUBST(ACLOCAL_AMFLAGS, "\${ACLOCAL_FLAGS}")
+ 
+ GNOME_MAINTAINER_MODE_DEFINES
+ 
+ GNOME_COMPILE_WARNINGS(maximum)
+ 
+ AC_ARG_ENABLE(deprecations,
+               [AC_HELP_STRING([--enable-deprecations],
+                               [warn about deprecated usages [default=no]])],,
+               [enable_deprecations=no])
+ 
+ if test "x$enable_deprecations" = "xyes"; then
+    DISABLE_DEPRECATED_CFLAGS=$DISABLE_DEPRECATED
+    AC_SUBST([DISABLE_DEPRECATED_CFLAGS])
+ fi
+ 
+ GLIB_REQUIRED=2.16.0
+ LIBGNOMEUI_REQUIRED=2.2.0
+ GTK_REQUIRED=2.14.0
+ DBUS_GLIB_REQUIRED=0.76
++POLKIT_GOBJECT_REQUIRED=0.96
+ DEVKIT_POWER_REQUIRED=008
+ LIBNOTIFY_REQUIRED=0.4.3
+ 
+ dnl ====================================================================
+ dnl Dependency Checks
+ dnl ====================================================================
+ PKG_PROG_PKG_CONFIG()
+ 
+ PKG_CHECK_MODULES(GNOME_SESSION,
+         glib-2.0 >= $GLIB_REQUIRED
+         gio-2.0 >= $GLIB_REQUIRED
+         gtk+-2.0 >= $GTK_REQUIRED
+         dbus-glib-1 >= $DBUS_GLIB_REQUIRED
+         devkit-power-gobject >= $DEVKIT_POWER_REQUIRED
+         libnotify >= $LIBNOTIFY_REQUIRED
+ )
+ 
+ PKG_CHECK_MODULES(SESSION_PROPERTIES,
+         glib-2.0 >= $GLIB_REQUIRED
+         gtk+-2.0 >= $GTK_REQUIRED
+         dbus-glib-1 >= $DBUS_GLIB_REQUIRED
+ )
+ 
+ PKG_CHECK_MODULES(SPLASH,
+         glib-2.0 >= $GLIB_REQUIRED
+         gtk+-2.0 >= $GTK_REQUIRED
+         dbus-glib-1 >= $DBUS_GLIB_REQUIRED
+         libstartup-notification-1.0
+         gconf-2.0)
+ 
+ PKG_CHECK_MODULES(COMPAT,
+         gtk+-2.0 >= $GTK_REQUIRED
+         dbus-glib-1 >= $DBUS_GLIB_REQUIRED)
+ 
+ AC_ARG_ENABLE(session-selector, AS_HELP_STRING([--enable-session-selector],
+                                                [enable building a custom session selector dialog]),
+                                                 enable_session_selector=$enableval,enable_session_selector=no)
+ 
+ AM_CONDITIONAL(BUILD_SESSION_SELECTOR,
+                [test "$enable_session_selector" = yes])
+ 
+ if test "$enable_session_selector" = yes; then
+         PKG_CHECK_MODULES(SESSION_SELECTOR,
+                           dbus-glib-1 >= $DBUS_GLIB_REQUIRED
+                           gtk+-2.0 >= 2.18
+                           gmodule-export-2.0
+                           gconf-2.0)
+ fi
+ 
+ PKG_CHECK_MODULES(SM, sm)
+ PKG_CHECK_MODULES(ICE, ice)
+ 
+ PKG_CHECK_MODULES(DBUS_GLIB, dbus-glib-1 >= $DBUS_GLIB_REQUIRED)
+ PKG_CHECK_MODULES(GCONF, gconf-2.0)
+ 
+ PKG_CHECK_MODULES(EGG_SMCLIENT, gtk+-2.0)
+ 
++have_polkit=no
++AC_ARG_ENABLE([polkit],
++  AC_HELP_STRING([--enable-polkit], [Enable PolicyKit support (default auto)]),
++  enable_polkit=$enableval,
++  enable_polkit=auto)
++if test "x$enable_polkit" != "xno"; then
++  PKG_CHECK_MODULES(POLKIT_GOBJECT, polkit-gobject-1 >= $POLKIT_GOBJECT_REQUIRED, have_polkit=yes, have_polkit=no)
++  if test "x$enable_polkit" = "xyes" -a "x$have_polkit" = "xno"; then
++    AC_MSG_ERROR([PolicyKit support explicitly requested but dependencies not found])
++  fi
++fi
++
++if test "x$have_polkit" = "xyes"; then
++  AC_DEFINE(HAVE_POLKIT_GOBJECT, [1], [whether polkit was found])
++fi
+ 
+ dnl ====================================================================
+ dnl Option to set the default window manager
+ dnl ====================================================================
+ AC_ARG_WITH(default-wm,
+               [AC_HELP_STRING([--with-default-wm],
+                               [Specify the default window manager @<:@default=metacity@:>@])],,
+                               [with_default_wm="metacity"])
+ 
+ DEFAULT_WM=$with_default_wm
+ AC_SUBST(DEFAULT_WM)
+ AM_CONDITIONAL(USE_GNOME_WM, test x$with_default_wm = xgnome-wm)
+ 
+ dnl ====================================================================
+ dnl Option to enable the splash screen
+ dnl ====================================================================
+ AC_ARG_ENABLE(splash,
+               [AC_HELP_STRING([--enable-splash],
+                               [enable splash screen [default=no]])],,
+               [enable_splash=no])
+ 
+ AM_CONDITIONAL(ENABLE_SPLASH, test x$enable_splash = xyes)
+ 
+ dnl ====================================================================
+ dnl GConf Checks
+ dnl ====================================================================
+ AC_PATH_PROG(GCONFTOOL, gconftool-2, no)
+ if test x"$GCONFTOOL" = xno; then
+   AC_MSG_ERROR([gconftool-2 executable not found in your path - should be installed with GConf])
+ fi
+diff --git a/gnome-session/Makefile.am b/gnome-session/Makefile.am
+index 5508f2e..9db95a9 100644
+--- a/gnome-session/Makefile.am
++++ b/gnome-session/Makefile.am
+@@ -1,81 +1,83 @@
+ NULL =
+ 
+ bin_PROGRAMS = gnome-session
+ 
+ noinst_LTLIBRARIES = libgsmutil.la
+ 
+ noinst_PROGRAMS = 		\
+ 	test-client-dbus	\
+ 	test-inhibit		\
+ 	$(NULL)
+ 
+ INCLUDES =					\
+ 	$(WARN_CFLAGS)				\
+ 	$(DISABLE_DEPRECATED_CFLAGS)		\
+ 	$(SM_CFLAGS)				\
+ 	$(ICE_CFLAGS)				\
+ 	$(GNOME_SESSION_CFLAGS)			\
+ 	$(GCONF_CFLAGS)				\
++	$(POLKIT_GOBJECT_CFLAGS)		\
+ 	-I$(top_srcdir)/egg			\
+ 	-DLOCALE_DIR=\""$(datadir)/locale"\"	\
+ 	-DDATA_DIR=\""$(datadir)/gnome-session"\" \
+ 	-DDBUS_LAUNCH=\"dbus-launch\"		\
+ 	-DLIBEXECDIR=\"$(libexecdir)\"		\
+ 	-DGTKBUILDER_DIR=\""$(pkgdatadir)"\"		\
+ 	-DGCONF_SANITY_CHECK=\""$(GCONF_SANITY_CHECK)"\" \
+ 	-DGCONFTOOL_CMD=\"$(GCONFTOOL)\"	\
+ 	-DI_KNOW_THE_DEVICEKIT_POWER_API_IS_SUBJECT_TO_CHANGE
+ 
+ test_inhibit_SOURCES = 	\
+ 	test-inhibit.c	\
+ 	$(NULL)
+ 
+ test_inhibit_LDADD =				\
+ 	$(GNOME_SESSION_LIBS)			\
+ 	$(NULL)
+ 
+ test_client_dbus_SOURCES = 	\
+ 	test-client-dbus.c	\
+ 	$(NULL)
+ 
+ test_client_dbus_LDADD =			\
+ 	$(DBUS_GLIB_LIBS)			\
+ 	$(NULL)
+ 
+ gnome_session_LDADD =				\
+ 	libgsmutil.la 				\
+ 	$(top_builddir)/egg/libeggdesktopfile.la \
+ 	$(SM_LIBS)				\
+ 	$(ICE_LIBS)				\
+ 	$(GNOME_SESSION_LIBS)			\
+ 	$(GCONF_LIBS)				\
++	$(POLKIT_GOBJECT_LIBS)			\
+ 	$(XRENDER_LIBS)				\
+ 	$(XTEST_LIBS)				\
+ 	$(EXECINFO_LIBS)			\
+ 	$(NULL)
+ 
+ gnome_session_SOURCES =				\
+ 	gsm-app.h				\
+ 	gsm-app.c				\
+ 	gsm-autostart-app.h			\
+ 	gsm-autostart-app.c			\
+ 	gsm-client.c				\
+ 	gsm-client.h				\
+ 	gsm-xsmp-client.h			\
+ 	gsm-xsmp-client.c			\
+ 	gsm-dbus-client.h			\
+ 	gsm-dbus-client.c			\
+ 	gsm-marshal.h				\
+ 	gsm-marshal.c				\
+ 	gsm-consolekit.c			\
+ 	gsm-consolekit.h			\
+ 	gsm-logout-dialog.h			\
+ 	gsm-logout-dialog.c			\
+ 	gsm-inhibit-dialog.h			\
+ 	gsm-inhibit-dialog.c			\
+ 	gs-idle-monitor.h			\
+ 	gs-idle-monitor.c			\
+ 	gsm-presence.h				\
+ 	gsm-presence.c				\
+ 	gsm-gconf.c				\
+ 	gsm-gconf.h				\
+diff --git a/gnome-session/gsm-consolekit.c b/gnome-session/gsm-consolekit.c
+index e8dd726..20dc3f2 100644
+--- a/gnome-session/gsm-consolekit.c
++++ b/gnome-session/gsm-consolekit.c
+@@ -1,97 +1,106 @@
+ /* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
+  *
+  * Copyright (C) 2008 Jon McCann <jmccann@redhat.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2, or (at your option)
+  * any later version.
+  *
+  * This program is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+  * 02111-1307, USA.
+  */
+ 
+ #include "config.h"
+ 
+ #include <errno.h>
+ #include <string.h>
+ #include <unistd.h>
+ 
+ #include <glib.h>
+ #include <glib-object.h>
+ #include <glib/gi18n.h>
+ 
++#ifdef HAVE_POLKIT_GOBJECT
++#include <polkit/polkit.h>
++#endif
++
+ #include <dbus/dbus-glib.h>
+ #include <dbus/dbus-glib-lowlevel.h>
+ 
+ #include "gsm-marshal.h"
+ #include "gsm-consolekit.h"
+ 
+ #define CK_NAME      "org.freedesktop.ConsoleKit"
+ #define CK_PATH      "/org/freedesktop/ConsoleKit"
+ #define CK_INTERFACE "org.freedesktop.ConsoleKit"
+ 
+ #define CK_MANAGER_PATH      "/org/freedesktop/ConsoleKit/Manager"
+ #define CK_MANAGER_INTERFACE "org.freedesktop.ConsoleKit.Manager"
+ #define CK_SEAT_INTERFACE    "org.freedesktop.ConsoleKit.Seat"
+ #define CK_SESSION_INTERFACE "org.freedesktop.ConsoleKit.Session"
+ 
+ #define GSM_CONSOLEKIT_GET_PRIVATE(o)                                   \
+         (G_TYPE_INSTANCE_GET_PRIVATE ((o), GSM_TYPE_CONSOLEKIT, GsmConsolekitPrivate))
+ 
+ struct _GsmConsolekitPrivate
+ {
+         DBusGConnection *dbus_connection;
+         DBusGProxy      *bus_proxy;
+         DBusGProxy      *ck_proxy;
+         guint32          is_connected : 1;
+ };
+ 
+ enum {
+         PROP_0,
+         PROP_IS_CONNECTED
+ };
+ 
+ enum {
+         REQUEST_COMPLETED = 0,
+         PRIVILEGES_COMPLETED,
+         LAST_SIGNAL
+ };
+ 
++typedef enum {
++        SYSTEM_RESTART,
++        SYSTEM_STOP
++} GsmConsoleKitSystemAction;
++
+ static guint signals[LAST_SIGNAL] = { 0 };
+ 
+ static void     gsm_consolekit_class_init   (GsmConsolekitClass *klass);
+ static void     gsm_consolekit_init         (GsmConsolekit      *ck);
+ static void     gsm_consolekit_finalize     (GObject            *object);
+ 
+ static void     gsm_consolekit_free_dbus    (GsmConsolekit      *manager);
+ 
+ static DBusHandlerResult gsm_consolekit_dbus_filter (DBusConnection *connection,
+                                                      DBusMessage    *message,
+                                                      void           *user_data);
+ 
+ static void     gsm_consolekit_on_name_owner_changed (DBusGProxy        *bus_proxy,
+                                                       const char        *name,
+                                                       const char        *prev_owner,
+                                                       const char        *new_owner,
+                                                       GsmConsolekit   *manager);
+ 
+ G_DEFINE_TYPE (GsmConsolekit, gsm_consolekit, G_TYPE_OBJECT);
+ 
+ static void
+ gsm_consolekit_get_property (GObject    *object,
+                              guint       prop_id,
+                              GValue     *value,
+                              GParamSpec *pspec)
+ {
+         GsmConsolekit *manager = GSM_CONSOLEKIT (object);
+ 
+         switch (prop_id) {
+         case PROP_IS_CONNECTED:
+@@ -332,60 +341,117 @@ gsm_consolekit_free_dbus (GsmConsolekit *manager)
+ 
+ static void
+ gsm_consolekit_finalize (GObject *object)
+ {
+         GsmConsolekit *manager;
+         GObjectClass  *parent_class;
+ 
+         manager = GSM_CONSOLEKIT (object);
+ 
+         parent_class = G_OBJECT_CLASS (gsm_consolekit_parent_class);
+ 
+         gsm_consolekit_free_dbus (manager);
+ 
+         if (parent_class->finalize != NULL) {
+                 parent_class->finalize (object);
+         }
+ }
+ 
+ GQuark
+ gsm_consolekit_error_quark (void)
+ {
+         static GQuark error_quark = 0;
+ 
+         if (error_quark == 0) {
+                 error_quark = g_quark_from_static_string ("gsm-consolekit-error");
+         }
+ 
+         return error_quark;
+ }
+ 
++gboolean
++gsm_consolekit_other_users_logged_in (GsmConsolekit *self)
++{
++        GError    *error;
++        gboolean   res;
++        gboolean   other_users_logged_in = FALSE;
++        GPtrArray *sessions;
++        guint i;
++
++        error = NULL;
++        res = dbus_g_proxy_call_with_timeout (self->priv->ck_proxy,
++                                              "GetSessions",
++                                              INT_MAX,
++                                              &error,
++                                              G_TYPE_INVALID,
++                                              dbus_g_type_get_collection ("GPtrArray", DBUS_TYPE_G_OBJECT_PATH),
++                                              &sessions,
++                                              G_TYPE_INVALID);
++
++        if (!res) {
++                g_warning ("Could not ask ConsoleKit for open sessions: %s",
++                           error->message);
++                g_clear_error (&error);
++                return FALSE;
++        }
++
++        for (i = 0; i < sessions->len && !other_users_logged_in; i++) {
++                DBusGProxy *proxy;
++                guint uid;
++                const char *session = g_ptr_array_index(sessions, i);
++
++                proxy = dbus_g_proxy_new_for_name (self->priv->dbus_connection,
++                                                   CK_NAME,
++                                                   session,
++                                                   CK_SESSION_INTERFACE);
++                res = dbus_g_proxy_call_with_timeout (proxy,
++                                                      "GetUnixUser",
++                                                      INT_MAX,
++                                                      &error,
++                                                      G_TYPE_INVALID,
++                                                      G_TYPE_UINT, &uid,
++                                                      G_TYPE_INVALID);
++
++                if (!res) {
++                        g_warning ("Couldn't get user for session %s: %s",
++                                   session, error->message);
++                        g_clear_error (&error);
++                } else if ((uid_t) uid != getuid ()) {
++                        other_users_logged_in = TRUE;
++                }
++                g_object_unref (proxy);
++        }
++        g_ptr_array_free (sessions, TRUE);
++
++        return other_users_logged_in;
++}
++
+ GsmConsolekit *
+ gsm_consolekit_new (void)
+ {
+         GsmConsolekit *manager;
+ 
+         manager = g_object_new (GSM_TYPE_CONSOLEKIT, NULL);
+ 
+         return manager;
+ }
+ 
+ static void
+ emit_restart_complete (GsmConsolekit *manager,
+                        GError        *error)
+ {
+         GError *call_error;
+ 
+         call_error = NULL;
+ 
+         if (error != NULL) {
+                 call_error = g_error_new_literal (GSM_CONSOLEKIT_ERROR,
+                                                   GSM_CONSOLEKIT_ERROR_RESTARTING,
+                                                   error->message);
+         }
+ 
+         g_signal_emit (G_OBJECT (manager),
+                        signals [REQUEST_COMPLETED],
+                        0, call_error);
+ 
+         if (call_error != NULL) {
+                 g_error_free (call_error);
+@@ -721,78 +787,138 @@ seat_can_activate_sessions (DBusConnection *connection,
+ 
+ gboolean
+ gsm_consolekit_can_switch_user (GsmConsolekit *manager)
+ {
+         GError  *error;
+         char    *seat_id;
+         gboolean ret;
+ 
+         error = NULL;
+ 
+         if (!gsm_consolekit_ensure_ck_connection (manager, &error)) {
+                 g_warning ("Could not connect to ConsoleKit: %s",
+                            error->message);
+                 g_error_free (error);
+                 return FALSE;
+         }
+ 
+         seat_id = get_current_seat_id (dbus_g_connection_get_connection (manager->priv->dbus_connection));
+         if (seat_id == NULL || seat_id[0] == '\0') {
+                 g_debug ("seat id is not set; can't switch sessions");
+                 return FALSE;
+         }
+ 
+         ret = seat_can_activate_sessions (dbus_g_connection_get_connection (manager->priv->dbus_connection),
+                                           seat_id);
+         g_free (seat_id);
+ 
+         return ret;
+ }
+ 
+-gboolean
+-gsm_consolekit_get_restart_privileges (GsmConsolekit *manager)
++static gboolean
++get_consolekit_privileges (GsmConsolekit             *manager,
++                           GsmConsoleKitSystemAction  action)
+ {
++#ifdef HAVE_POLKIT_GOBJECT
++        PolkitDetails *details;
++        PolkitSubject *subject;
++        gboolean got_consolekit_privileges = FALSE;
++        gboolean other_users_logged_in = FALSE;
++        const char *action_id;
++        PolkitAuthority *authority;
++        PolkitAuthorizationResult *result;
++        PolkitCheckAuthorizationFlags flags;
++        GError *error = NULL;
++
++        other_users_logged_in = gsm_consolekit_other_users_logged_in (manager);
++        details = polkit_details_new ();
++        subject = polkit_unix_process_new (getpid ());
++        flags = POLKIT_CHECK_AUTHORIZATION_FLAGS_ALLOW_USER_INTERACTION;
++
++        switch (action) {
++                case SYSTEM_RESTART:
++                        if (other_users_logged_in) {
++                                action_id = "org.freedesktop.consolekit.system.restart-multiple-users";
++                        } else {
++                                action_id = "org.freedesktop.consolekit.system.restart";
++                        }
++                        break;
++                case SYSTEM_STOP:
++                        if (other_users_logged_in) {
++                                action_id = "org.freedesktop.consolekit.system.stop-multiple-users";
++                        } else {
++                                action_id = "org.freedesktop.consolekit.system.stop";
++                        }
++                        break;
++        }
++
++        authority = polkit_authority_get ();
++        result = polkit_authority_check_authorization_sync (authority,
++                                                            subject,
++                                                            action_id,
++                                                            details,
++                                                            flags,
++                                                            NULL,
++                                                            &error);
++
++        if (result == NULL) {
++                g_warning ("Couldn't check for authorization: %s", error->message);
++                g_clear_error (&error);
++        } else {
++                got_consolekit_privileges = polkit_authorization_result_get_is_authorized (result);
++                g_object_unref (result);
++        }
++
++        g_object_unref (authority);
++        g_object_unref (subject);
++        g_object_unref (details);
++
+ 	g_signal_emit (G_OBJECT (manager),
+ 		       signals [PRIVILEGES_COMPLETED],
+-		       0, TRUE, TRUE, NULL);
++		       0, got_consolekit_privileges, TRUE, NULL);
++
++        return TRUE;
++#endif
+ 
+-	return TRUE;
++        return FALSE;
+ }
+ 
+ gboolean
+-gsm_consolekit_get_stop_privileges (GsmConsolekit *manager)
++gsm_consolekit_get_restart_privileges (GsmConsolekit *manager)
+ {
+-	g_signal_emit (G_OBJECT (manager),
+-		       signals [PRIVILEGES_COMPLETED],
+-		       0, TRUE, TRUE, NULL);
++        return get_consolekit_privileges (manager, SYSTEM_RESTART);
++}
+ 
+-	return TRUE;
++gboolean
++gsm_consolekit_get_stop_privileges (GsmConsolekit *manager)
++{
++        return get_consolekit_privileges (manager, SYSTEM_STOP);
+ }
+ 
+ gboolean
+ gsm_consolekit_can_restart (GsmConsolekit *manager)
+ {
+         gboolean res;
+ 	gboolean can_restart;
+         GError  *error;
+ 
+         error = NULL;
+ 
+         if (!gsm_consolekit_ensure_ck_connection (manager, &error)) {
+                 g_warning ("Could not connect to ConsoleKit: %s",
+                            error->message);
+                 g_error_free (error);
+                 return FALSE;
+         }
+ 
+         res = dbus_g_proxy_call_with_timeout (manager->priv->ck_proxy,
+                                               "CanRestart",
+                                               INT_MAX,
+                                               &error,
+                                               G_TYPE_INVALID,
+                                               G_TYPE_BOOLEAN, &can_restart,
+                                               G_TYPE_INVALID);
+ 
+ 	return can_restart;
+ }
+ 
+ gboolean
+diff --git a/gnome-session/gsm-consolekit.h b/gnome-session/gsm-consolekit.h
+index f80c130..29ee23d 100644
+--- a/gnome-session/gsm-consolekit.h
++++ b/gnome-session/gsm-consolekit.h
+@@ -48,54 +48,55 @@ struct _GsmConsolekit
+ 
+         GsmConsolekitPrivate *priv;
+ };
+ 
+ struct _GsmConsolekitClass
+ {
+         GObjectClass parent_class;
+ 
+         void (* request_completed) (GsmConsolekit *manager,
+                                     GError        *error);
+ 
+         void (* privileges_completed) (GsmConsolekit *manager,
+                                        gboolean       success,
+                                        gboolean       ask_later,
+                                        GError        *error);
+ };
+ 
+ enum _GsmConsolekitError {
+         GSM_CONSOLEKIT_ERROR_RESTARTING = 0,
+         GSM_CONSOLEKIT_ERROR_STOPPING
+ };
+ 
+ #define GSM_CONSOLEKIT_SESSION_TYPE_LOGIN_WINDOW "LoginWindow"
+ 
+ GType            gsm_consolekit_get_type        (void);
+ 
+ GQuark           gsm_consolekit_error_quark     (void);
+ 
+ GsmConsolekit   *gsm_consolekit_new             (void) G_GNUC_MALLOC;
+ 
++gboolean         gsm_consolekit_other_users_logged_in (GsmConsolekit *manager);
+ gboolean         gsm_consolekit_can_switch_user (GsmConsolekit *manager);
+ 
+ gboolean         gsm_consolekit_get_restart_privileges (GsmConsolekit *manager);
+ 
+ gboolean         gsm_consolekit_get_stop_privileges    (GsmConsolekit *manager);
+ 
+ gboolean         gsm_consolekit_can_stop        (GsmConsolekit *manager);
+ 
+ gboolean         gsm_consolekit_can_restart     (GsmConsolekit *manager);
+ 
+ void             gsm_consolekit_attempt_stop    (GsmConsolekit *manager);
+ 
+ void             gsm_consolekit_attempt_restart (GsmConsolekit *manager);
+ 
+ void             gsm_consolekit_set_session_idle (GsmConsolekit *manager,
+                                                   gboolean       is_idle);
+ 
+ gchar           *gsm_consolekit_get_current_session_type (GsmConsolekit *manager);
+ 
+ GsmConsolekit   *gsm_get_consolekit             (void);
+ 
+ G_END_DECLS
+ 
+ #endif /* __GSM_CONSOLEKIT_H__ */
+-- 
+2.7.4
+

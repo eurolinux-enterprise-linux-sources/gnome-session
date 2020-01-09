@@ -3,6 +3,7 @@
 %define dbus_version 0.90
 %define gnome_keyring_version 2.21.92
 %define gconf2_version 2.14.0
+%define polkit_version 0.96
 %define libnotify_version 0.2.1
 
 %define po_package gnome-session-2.0
@@ -10,7 +11,7 @@
 Summary: GNOME session manager
 Name: gnome-session
 Version: 2.28.0
-Release: 22%{?dist}
+Release: 24%{?dist}
 URL: http://www.gnome.org
 Source0: http://download.gnome.org/sources/gnome-session/2.28/%{name}-%{version}.tar.bz2
 # latest upstream translations
@@ -45,6 +46,7 @@ BuildRequires: gnome-keyring-devel >= %{gnome_keyring_version}
 BuildRequires: libnotify-devel >= %{libnotify_version}
 BuildRequires: GConf2-devel >= %{gconf2_version}
 BuildRequires: GConf2-gtk >= %{gconf2_version}
+BuildRequires: polkit-devel >= %{polkit_version}
 BuildRequires: gnome-desktop-devel
 BuildRequires: pango-devel
 BuildRequires: gnome-settings-daemon-devel
@@ -72,11 +74,6 @@ Requires(pre): GConf2 >= %{gconf2_version}
 Requires(post): GConf2 >= %{gconf2_version}
 Requires(preun): GConf2 >= %{gconf2_version}
 
-# https://bugzilla.gnome.org/show_bug.cgi?id=592520
-#Patch0: unresponsive-timeout.patch
-# https://bugzilla.gnome.org/show_bug.cgi?id=592519
-#Patch1: show-lock.patch
-# https://bugzilla.gnome.org/show_bug.cgi?id=598211
 Patch2: xsmp-stop.patch
 
 # https://bugzilla.gnome.org/show_bug.cgi?id=597030
@@ -112,6 +109,9 @@ Patch12: add-close-button.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=982423
 Patch13: check-for-sm.patch
 
+# https://bugzilla.redhat.com/show_bug.cgi?id=1320245
+Patch14: fix-cancel-after-shutdown.patch
+
 %description
 gnome-session manages a GNOME desktop or GDM login session. It starts up
 the other core GNOME components and handles logout and saving the session.
@@ -135,16 +135,12 @@ lets the user manage multiple saved sessions.
 
 %prep
 %setup -q
-#%patch0 -p1 -b .unresponsive-timeout
-#%patch1 -p1 -b .show-lock
 %patch2 -p1 -b .xsmp-stop
 %patch3 -p1 -b .max-idle
 %patch4 -p1 -b .nag-root-user
 %patch5 -p1 -b .custom-sessions
 
 echo "ACLOCAL_AMFLAGS = -I m4" >> Makefile.am
-
-autoreconf -i -f
 
 cp %{SOURCE3} po
 
@@ -155,11 +151,15 @@ cp %{SOURCE3} po
 %patch11 -p1 -b .fix-save-and-close
 %patch12 -p1 -b .add-close-button
 %patch13 -p1 -b .check-for-sm
+%patch14 -p1 -b .fix-cancel-after-shutdown
+
+autoreconf -i -f
 
 %build
 
-%configure --enable-docbook-docs --docdir=%{_datadir}/doc/%{name}-%{version} --enable-session-selector
-make %{?_smp_mflags}
+%configure --enable-docbook-docs --docdir=%{_datadir}/doc/%{name}-%{version} --enable-session-selector --enable-polkit
+cat config.h
+make %{?_smp_mflags} V=1
 
 %install
 rm -rf $RPM_BUILD_ROOT
@@ -248,6 +248,14 @@ fi
 %{_sysconfdir}/xdg/autostart/gnome-settings-daemon-helper.desktop
 
 %changelog
+* Mon Nov 07 2016 Ray Strode <rstrode@redhat.com> 2.28.0-24
+- Make sure autoreconf is run so new polkit feature is picked up.
+  Related: #1320245
+
+* Mon Nov 07 2016 Ray Strode <rstrode@redhat.com> - 2.28.0-23
+- Fix cancel after shutdown (or restart)
+  Resolves: #1320245
+
 * Sun Jun 22 2014 Ray Strode <rstrode@redhat.com> 2.28.0-22
 - Don't start session manager if it's already running
   Resolves: #982423
