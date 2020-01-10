@@ -6,7 +6,7 @@
 
 Name: gnome-session
 Version: 3.28.1
-Release: 5%{?dist}
+Release: 6%{?dist}
 Summary: GNOME session manager
 
 License: GPLv2+
@@ -46,6 +46,8 @@ Patch21: gnome-session-python3.patch
 Patch31: 0002-autostart-ensure-gnome-shell-and-mutter-get-right-au.patch
 
 Patch40: 0001-main-don-t-call-into-gdbus-before-setting-all-enviro.patch
+
+Patch50: fix-crash-on-no-dispay.patch
 
 BuildRequires: meson
 BuildRequires: gcc
@@ -190,6 +192,10 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 %{_datadir}/glib-2.0/schemas/org.gnome.SessionManager.gschema.xml
 
 %changelog
+* Tue Oct 02 2018 Ray Strode <rstrode@redhat.com> - 3.28.1-6
+- Fix crash in gles helper if there's no display
+  Resolves: #1627056
+
 * Thu Jul 26 2018 Ray Strode <rstrode@redhat.com> - 3.28.1-5
 - Fix gnome-disk-utility timeout at startup
   Resolves: #1593215
