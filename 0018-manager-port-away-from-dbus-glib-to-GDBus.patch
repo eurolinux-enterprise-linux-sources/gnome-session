@@ -1,15 +1,17 @@
-From 916d9ba86cf2020ffedff331397ed02b5e53f030 Mon Sep 17 00:00:00 2001
+From 62a3cf703542e282f6c378cf633dd494b4cc786c Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Wed, 8 Mar 2017 16:36:44 -0500
 Subject: [PATCH 18/19] manager: port away from dbus-glib to GDBus
 
 ---
- capplet/gsm-properties-dialog.c | 52 +++++++++++++++++++++--------------------
- configure.ac                    |  2 +-
- gnome-session/gsm-manager.c     | 16 ++++++-------
- gnome-session/gsm-manager.h     |  3 ++-
- tools/gnome-session-selector.c  | 48 ++++++++++++++++++++-----------------
- 5 files changed, 64 insertions(+), 57 deletions(-)
+ capplet/gsm-properties-dialog.c | 52 +++++++++++++++++----------------
+ capplet/meson.build             |  3 +-
+ gnome-session/gsm-manager.c     | 16 +++++-----
+ gnome-session/gsm-manager.h     |  3 +-
+ meson.build                     |  1 -
+ tools/gnome-session-selector.c  | 48 ++++++++++++++++--------------
+ tools/meson.build               |  3 +-
+ 7 files changed, 65 insertions(+), 61 deletions(-)
 
 diff --git a/capplet/gsm-properties-dialog.c b/capplet/gsm-properties-dialog.c
 index 51fa5106..04452c1a 100644
@@ -211,75 +213,51 @@ index 51fa5106..04452c1a 100644
  }
  
  static void
-diff --git a/configure.ac b/configure.ac
-index d0eeab8a..5182c09e 100644
---- a/configure.ac
-+++ b/configure.ac
-@@ -21,61 +21,61 @@ LT_PREREQ([2.2.6])
- LT_INIT([dlopen disable-static])
- 
- GNOME_MAINTAINER_MODE_DEFINES
- GNOME_COMPILE_WARNINGS([maximum])
- 
- AC_ARG_ENABLE(deprecation_flags,
-               [AS_HELP_STRING([--enable-deprecation-flags],
-                               [use *_DISABLE_DEPRECATED flags @<:@default=no@:>@])],,
-               [enable_deprecation_flags=no])
- 
- if test "x$enable_deprecation_flags" = "xyes"; then
-    DISABLE_DEPRECATED_CFLAGS=$DISABLE_DEPRECATED
-    AC_SUBST([DISABLE_DEPRECATED_CFLAGS])
- fi
- 
- GLIB_REQUIRED=2.46.0
- GTK3_REQUIRED=3.18.0
- DBUS_GLIB_REQUIRED=0.76
- UPOWER_REQUIRED=0.9.0
- JSON_GLIB_REQUIRED=0.10
- GNOME_DESKTOP_REQUIRED=3.18.0
- 
- AC_ARG_ENABLE(session-selector, AS_HELP_STRING([--enable-session-selector],
-                                                [enable building a custom session selector dialog]),
-                                                 enable_session_selector=$enableval,enable_session_selector=no)
- 
- AM_CONDITIONAL(BUILD_SESSION_SELECTOR,
-                [test "$enable_session_selector" = yes])
- 
- if test "$enable_session_selector" = yes; then
--        PKG_CHECK_MODULES(SESSION_SELECTOR, gtk+-3.0 gio-2.0 dbus-glib-1 >= $DBUS_GLIB_REQUIRED)
-+        PKG_CHECK_MODULES(SESSION_SELECTOR, gtk+-3.0 gio-2.0)
- fi
- 
- dnl ====================================================================
- dnl Dependency Checks
- dnl ====================================================================
- 
- dnl Standard vertical stacks
- PKG_CHECK_MODULES(GIO, gio-2.0)
- PKG_CHECK_MODULES(GIOUNIX, gio-unix-2.0 >= $GLIB_REQUIRED)
- PKG_CHECK_MODULES(GTK3, gtk+-3.0 >= $GTK3_REQUIRED)
- 
- PKG_CHECK_MODULES(GNOME_SESSION,
-         glib-2.0 >= $GLIB_REQUIRED
-         gio-2.0 >= $GLIB_REQUIRED
-         json-glib-1.0 >= $JSON_GLIB_REQUIRED
-         gnome-desktop-3.0 >= $GNOME_DESKTOP_REQUIRED
+diff --git a/capplet/meson.build b/capplet/meson.build
+index ae6cb6b9..8dad9c80 100644
+--- a/capplet/meson.build
++++ b/capplet/meson.build
+@@ -1,37 +1,36 @@
+ install_data(
+   install_dir: session_bindir
  )
  
- dnl We can only support old upower
- dnl https://bugzilla.gnome.org/show_bug.cgi?id=710383
- PKG_CHECK_MODULES(UPOWER, upower-glib < 0.99.0, have_old_upower=yes, have_old_upower=no)
- AS_IF([test x$have_old_upower = xyes], [
-   AC_DEFINE([HAVE_OLD_UPOWER], [1], [Define if we have an older upower])
- ])
- AM_CONDITIONAL(HAVE_OLD_UPOWER, test x$have_old_upower = xyes)
+ deps = session_deps + [
+   glib_dep,
+   gtk_dep,
+   x11_dep,
+   sm_dep,
+-  ice_dep,
+-  dbus_glib_dep
++  ice_dep
+ ]
  
- PKG_CHECK_MODULES(SESSION_PROPERTIES,
-         glib-2.0 >= $GLIB_REQUIRED
-         gtk+-3.0 >= $GTK3_REQUIRED
+ cflags = [
+   '-DLOCALE_DIR="@0@"'.format(session_localedir),
+   '-DGTKBUILDER_DIR="@0@"'.format(session_pkgdatadir)
+ ]
+ 
+ sources = files(
+   '../gnome-session/gsm-util.c',
+   'gsm-app-dialog.c',
+   'gsm-properties-dialog.c',
+   'gsp-app.c',
+   'gsp-app-manager.c',
+   'gsp-keyfile.c',
+   'main.c'
+ )
+ 
+ executable(
+   'gnome-session-properties',
+   sources,
+   include_directories: [ top_inc, include_directories('../gnome-session') ],
+   dependencies: deps,
+   c_args: cflags,
+   install: true,
+   install_dir: session_bindir
  )
 diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
-index 135392fd..29c3054d 100644
+index 325c6c46..f4a94d1a 100644
 --- a/gnome-session/gsm-manager.c
 +++ b/gnome-session/gsm-manager.c
 @@ -1210,78 +1210,78 @@ _client_request_save (GsmClient            *client,
@@ -570,6 +548,72 @@ index fcf36019..88a88ccc 100644
  G_END_DECLS
  
  #endif /* __GSM_MANAGER_H */
+diff --git a/meson.build b/meson.build
+index 24221bb6..9a16d5b1 100644
+--- a/meson.build
++++ b/meson.build
+@@ -72,61 +72,60 @@ if enable_deprecation_flags
+ endif
+ 
+ compiler_flags = []
+ if session_debug
+   test_cflags = [
+     '-Werror=format=2',
+     '-Werror=implicit-function-declaration',
+     '-Werror=init-self',
+     '-Werror=missing-include-dirs',
+     '-Werror=missing-prototypes',
+     '-Werror=pointer-arith',
+     '-Werror=return-type',
+     '-Wnested-externs',
+     '-Wstrict-prototypes'
+   ]
+ 
+   compiler_flags += cc.get_supported_arguments(test_cflags)
+ endif
+ 
+ add_project_arguments(common_flags + compiler_flags, language: 'c')
+ 
+ glib_req_version = '>= 2.46.0'
+ 
+ gio_dep = dependency('gio-2.0', version: glib_req_version)
+ glib_dep = dependency('glib-2.0', version: glib_req_version)
+ gtk_dep = dependency('gtk+-3.0', version: '>= 3.18.0')
+ xtrans_dep = dependency('xtrans')
+ ice_dep = dependency('ice')
+ sm_dep = dependency('sm')
+ x11_dep = dependency('x11')
+-dbus_glib_dep = dependency('dbus-glib-1')
+ 
+ session_deps = [
+   gio_dep,
+   glib_dep,
+   dependency('gnome-desktop-3.0', version: '>= 3.18.0'),
+   dependency('json-glib-1.0', version: '>= 0.10')
+ ]
+ 
+ session_bin_deps = session_deps + [
+   xtrans_dep,
+   ice_dep,
+   sm_dep
+ ]
+ 
+ # Check for session selector GTK+ UI
+ enable_session_selector = get_option('session_selector')
+ 
+ # Check for session tracking backend
+ session_tracking = 'null backend'
+ 
+ enable_systemd = get_option('systemd')
+ enable_systemd_journal = get_option('systemd_journal')
+ enable_consolekit = get_option('consolekit')
+ if enable_systemd or enable_consolekit
+   session_bin_deps += dependency('gio-unix-2.0', version: glib_req_version)
+ 
+   # Check for systemd
+   if enable_systemd
+     libsystemd_dep = dependency('libsystemd', version: '>= 209', required: false)
+     session_bin_deps += libsystemd_dep
 diff --git a/tools/gnome-session-selector.c b/tools/gnome-session-selector.c
 index a41cd260..6ad307b0 100644
 --- a/tools/gnome-session-selector.c
@@ -751,6 +795,65 @@ index a41cd260..6ad307b0 100644
  }
  
  int
+diff --git a/tools/meson.build b/tools/meson.build
+index 4bd24220..10ee918c 100644
+--- a/tools/meson.build
++++ b/tools/meson.build
+@@ -1,53 +1,52 @@
+ install_data(
+   'gnome-session-custom-session',
+   install_dir: session_bindir
+ )
+ 
+ deps = session_deps + [
+   sm_dep,
+   ice_dep
+ ]
+ 
+ cflags = ['-DLOCALE_DIR="@0@"'.format(session_localedir)]
+ 
+ programs = [
+   # name, deps, cflags, install_dir
+   ['gnome-session-quit', deps, cflags, session_bindir],
+   ['gnome-session-inhibit', session_deps, cflags, session_bindir]
+ ]
+ 
+ if enable_session_selector
+   deps = [
+     glib_dep,
+-    gtk_dep,
+-    dbus_glib_dep
++    gtk_dep
+   ]
+ 
+   cflags += '-DGTKBUILDER_DIR="@0@"'.format(session_pkgdatadir)
+ 
+   programs += [['gnome-session-selector', deps, cflags, session_bindir]]
+ endif
+ 
+ deps = [
+   gtk_dep,
+   x11_dep,
+   dependency('egl'),
+   dependency('glesv2')
+ ]
+ 
+ cflags = '-DPKGDATADIR="@0@"'.format(session_pkgdatadir)
+ 
+ programs += [['gnome-session-check-accelerated-gles-helper', deps, cflags, session_libexecdir]]
+ 
+ deps = [
+   glib_dep,
+   x11_dep,
+   dependency('gl'),
+   dependency('epoxy'),
+   dependency('xcomposite')
+ ]
+ 
+ programs += [['gnome-session-check-accelerated-gl-helper', deps, cflags, session_libexecdir]]
+ 
+ deps += [gtk_dep]
+ 
 -- 
-2.14.2
+2.17.0
 

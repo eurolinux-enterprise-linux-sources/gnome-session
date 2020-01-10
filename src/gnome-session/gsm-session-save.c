@@ -22,6 +22,7 @@
 #include <glib/gstdio.h>
 #include <gio/gio.h>
 
+#include "gsm-app.h"
 #include "gsm-util.h"
 #include "gsm-autostart-app.h"
 #include "gsm-client.h"
@@ -38,8 +39,20 @@ static gboolean gsm_session_clear_saved_session (const char *directory,
 typedef struct {
         const char  *dir;
         GHashTable  *discard_hash;
+        GsmStore    *app_store;
         GError     **error;
 } SessionSaveData;
+
+static gboolean
+_app_has_app_id (const char   *id,
+                 GsmApp       *app,
+                 const char   *app_id_a)
+{
+        const char *app_id_b;
+
+        app_id_b = gsm_app_peek_app_id (app);
+        return g_strcmp0 (app_id_a, app_id_b) == 0;
+}
 
 static gboolean
 save_one_client (char            *id,
@@ -48,6 +61,7 @@ save_one_client (char            *id,
 {
         GsmClient  *client;
         GKeyFile   *keyfile;
+        GsmApp     *app = NULL;
         const char *app_id;
         char       *path = NULL;
         char       *filename = NULL;
@@ -60,7 +74,20 @@ save_one_client (char            *id,
 
         local_error = NULL;
 
-        keyfile = gsm_client_save (client, &local_error);
+        app_id = gsm_client_peek_app_id (client);
+        if (!IS_STRING_EMPTY (app_id)) {
+                if (g_str_has_suffix (app_id, ".desktop"))
+                        filename = g_strdup (app_id);
+                else
+                        filename = g_strdup_printf ("%s.desktop", app_id);
+
+                path = g_build_filename (data->dir, filename, NULL);
+
+                app = (GsmApp *)gsm_store_find (data->app_store,
+                                                (GsmStoreFunc)_app_has_app_id,
+                                                (char *)app_id);
+        }
+        keyfile = gsm_client_save (client, app, &local_error);
 
         if (keyfile == NULL || local_error) {
                 goto out;
@@ -70,16 +97,6 @@ save_one_client (char            *id,
 
         if (local_error) {
                 goto out;
-        }
-
-        app_id = gsm_client_peek_app_id (client);
-        if (!IS_STRING_EMPTY (app_id)) {
-                if (g_str_has_suffix (app_id, ".desktop"))
-                        filename = g_strdup (app_id);
-                else
-                        filename = g_strdup_printf ("%s.desktop", app_id);
-
-                path = g_build_filename (data->dir, filename, NULL);
         }
 
         if (!path || g_file_test (path, G_FILE_TEST_EXISTS)) {
@@ -135,6 +152,7 @@ out:
 
 void
 gsm_session_save (GsmStore  *client_store,
+                  GsmStore  *app_store,
                   GError   **error)
 {
         GSettings       *settings;
@@ -159,6 +177,8 @@ gsm_session_save (GsmStore  *client_store,
         data.dir = save_dir;
         data.discard_hash = g_hash_table_new_full (g_str_hash, g_str_equal,
                                                    g_free, NULL);
+        data.app_store = app_store;
+
         /* remove old saved session */
         gsm_session_clear_saved_session (save_dir, data.discard_hash);
         data.error = error;

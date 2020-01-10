@@ -1,4 +1,4 @@
-From 622e54d54c65eba7c5d8e4172f8aae8a970126f9 Mon Sep 17 00:00:00 2001
+From 625609b907e37e30fa29eaf7beb9426fd2405eaa Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Thu, 18 Jan 2018 10:09:36 -0500
 Subject: [PATCH 2/2] autostart: ensure gnome-shell and mutter get right
@@ -15,10 +15,10 @@ are important for a functioning GNOME desktop.
  1 file changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/gnome-session/gsm-autostart-app.c b/gnome-session/gsm-autostart-app.c
-index 9eb1db5b..5617e549 100644
+index 2332b039..584a9105 100644
 --- a/gnome-session/gsm-autostart-app.c
 +++ b/gnome-session/gsm-autostart-app.c
-@@ -621,61 +621,71 @@ load_desktop_file (GsmAutostartApp  *app)
+@@ -545,61 +545,71 @@ load_desktop_file (GsmAutostartApp  *app)
          char    *startup_id;
          char    *phase_str;
          int      phase;
@@ -57,7 +57,7 @@ index 9eb1db5b..5617e549 100644
 +                /* These hardcoded checks are to keep upgrades working */
 +                if (app_id != NULL && g_str_has_prefix (app_id, "org.gnome.Shell"))
 +                        phase = GSM_MANAGER_PHASE_DISPLAY_SERVER;
-+                else if (app_id != NULL && g_str_has_prefix (app_id, "org.gnome.SettingsDaemon"))
++                else if (app_id != NULL && g_str_equal (app_id, "org.gnome.SettingsDaemon.desktop"))
 +                        phase = GSM_MANAGER_PHASE_INITIALIZATION;
 +                else
 +                        phase = GSM_MANAGER_PHASE_APPLICATION;

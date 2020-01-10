@@ -1,0 +1,8 @@
+--- gnome-session-3.28.1/meson_post_install.py.python3	2018-04-10 15:33:36.000000000 +0200
++++ gnome-session-3.28.1/meson_post_install.py	2018-05-21 14:31:10.725745790 +0200
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python3
++#!/usr/bin/env python
+ 
+ import os
+ import shutil

@@ -2,16 +2,20 @@
 
 %define po_package gnome-session-3.0
 
-Summary: GNOME session manager
+%global with_session_selector 1
+
 Name: gnome-session
-Version: 3.26.1
-Release: 11%{?dist}
+Version: 3.28.1
+Release: 5%{?dist}
+Summary: GNOME session manager
+
+License: GPLv2+
 URL: http://www.gnome.org
-#VCS: git:git://git.gnome.org/gnome-session
-Source0: http://download.gnome.org/sources/gnome-session/3.26/%{name}-%{version}.tar.xz
+Source0: http://download.gnome.org/sources/gnome-session/3.28/%{name}-%{version}.tar.xz
+Source1: session-properties-icons.tar.xz
 
 # Blacklist NV30: https://bugzilla.redhat.com/show_bug.cgi?id=745202
-Patch00:gnome-session-3.3.92-nv30.patch
+Patch00: gnome-session-3.3.92-nv30.patch
 Patch01: gnome-session-3.6.2-swrast.patch
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=1031182
@@ -36,28 +40,16 @@ Patch18: 0017-session-selector-use-classic-mode-by-default.patch
 Patch19: 0018-manager-port-away-from-dbus-glib-to-GDBus.patch
 Patch20: 0019-capplet-fix-disable-check-items.patch
 
-Patch30: 0001-save-make-sure-app-state-is-written-into-desktop-fil.patch
+# Fix the build with Python 2
+Patch21: gnome-session-python3.patch
+
 Patch31: 0002-autostart-ensure-gnome-shell-and-mutter-get-right-au.patch
 
 Patch40: 0001-main-don-t-call-into-gdbus-before-setting-all-enviro.patch
 
-License: GPLv2+
-Group: User Interface/Desktops
-
-Requires: system-logos
-# Needed for gnome-settings-daemon
-Requires: control-center-filesystem
-
-Requires: gsettings-desktop-schemas >= 0.1.7
-
-# pull in dbus-x11, see bug 209924
-Requires: dbus-x11
-
-# https://bugzilla.redhat.com/show_bug.cgi?id=1072801
-Requires: mesa-dri-drivers
-
+BuildRequires: meson
+BuildRequires: gcc
 BuildRequires: pkgconfig(egl)
-BuildRequires: pkgconfig(epoxy)
 BuildRequires: pkgconfig(gl)
 BuildRequires: pkgconfig(glesv2)
 BuildRequires: pkgconfig(gnome-desktop-3.0)
@@ -73,54 +65,53 @@ BuildRequires: pkgconfig(xext)
 BuildRequires: pkgconfig(xrender)
 BuildRequires: pkgconfig(xtrans)
 BuildRequires: pkgconfig(xtst)
-BuildRequires: GConf2-devel
-BuildRequires: pango-devel
-BuildRequires: desktop-file-utils
-BuildRequires: libXrandr-devel
-BuildRequires: librsvg2-devel
 
 # this is so the configure checks find /usr/bin/halt etc.
 BuildRequires: usermode
 
-BuildRequires: intltool, autoconf, automake
-BuildRequires: libtool
 BuildRequires: gettext
-BuildRequires: libX11-devel libXt-devel
-BuildRequires: libXtst-devel
+BuildRequires: intltool
 BuildRequires: xmlto
-BuildRequires: upower-devel
-BuildRequires: gnome-common
-BuildRequires: systemd-devel
-BuildRequires: polkit-devel
-BuildRequires: git
+BuildRequires: /usr/bin/xsltproc
 
 # an artificial requires to make sure we get dconf, for now
 Requires: dconf
+
+Requires: system-logos
+# Needed for gnome-settings-daemon
+Requires: control-center-filesystem
+
+Requires: gsettings-desktop-schemas >= 0.1.7
+
+# pull in dbus-x11, see bug 209924
+Requires: dbus-x11
+
+# https://bugzilla.redhat.com/show_bug.cgi?id=1072801
+Requires: mesa-dri-drivers
+
+Conflicts: gnome-settings-daemon < 3.27.90
 
 %description
 gnome-session manages a GNOME desktop or GDM login session. It starts up
 the other core GNOME components and handles logout and saving the session.
 
-%package wayland-session
-Summary: Desktop file for gnome-session (Wayland)
-Group: User Interface/Desktops
-Requires: gnome-session = %{version}-%{release}
-Requires: xorg-x11-server-Xwayland
-
-%description wayland-session
-Desktop file to add GNOME (Wayland)  to display manager session menu.
-
 %package xsession
 Summary: Desktop file for gnome-session
-Group: User Interface/Desktops
-Requires: gnome-session = %{version}-%{release}
+Requires: %{name}%{?_isa} = %{version}-%{release}
 
 %description xsession
 Desktop file to add GNOME to display manager session menu.
 
+%package wayland-session
+Summary: Desktop file for wayland based gnome session
+Requires: %{name}%{?_isa} = %{version}-%{release}
+Requires: xorg-x11-server-Xwayland%{?_isa}
+
+%description wayland-session
+Desktop file to add GNOME on wayland to display manager session menu.
+
 %package custom-session
 Summary: A facility to select and store saved sessions
-Group: User Interface/Desktop
 Requires: %{name}%{?_isa} = %{version}-%{release}
 
 %description custom-session
@@ -128,22 +119,22 @@ Installs a 'Custom' entry in the display manager session menu that
 lets the user manage multiple saved sessions.
 
 %prep
-%autosetup -S git
-
-echo "ACLOCAL_AMFLAGS = -I m4" >> Makefile.am
-
-autoreconf -i -f
+%autosetup -p1
+(cd data/icons; tar xvf %{SOURCE1})
 
 %build
-%configure --enable-docbook-docs                                \
-           --enable-session-selector                            \
-           --enable-systemd
-make %{?_smp_mflags} V=1
+%meson                                                          \
+%if 0%{?with_session_selector}
+           -Dsession_selector=true                              \
+%endif
+           -Dsystemd=true                                       \
+           -Dsystemd_journal=true
+%meson_build
 
 %install
+%meson_install
 
-%make_install
-
+rm -f $RPM_BUILD_ROOT%{_datadir}/wayland-sessions/gnome.desktop
 mv $RPM_BUILD_ROOT%{_datadir}/xsessions/gnome-xorg.desktop \
    $RPM_BUILD_ROOT%{_datadir}/wayland-sessions/gnome-wayland.desktop
 sed -i -e 's/Xorg/Wayland/g' $RPM_BUILD_ROOT%{_datadir}/wayland-sessions/gnome-wayland.desktop
@@ -166,11 +157,11 @@ fi
 gtk-update-icon-cache %{_datadir}/icons/hicolor &>/dev/null || :
 glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 
-%files wayland-session
-%{_datadir}/wayland-sessions/*
-
 %files xsession
-%{_datadir}/xsessions/*
+%{_datadir}/xsessions/gnome.desktop
+
+%files wayland-session
+%{_datadir}/wayland-sessions/gnome-wayland.desktop
 
 %files custom-session
 %{_datadir}/xsessions/gnome-custom-session.desktop
@@ -180,7 +171,8 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 %doc %{_mandir}/man*/gnome-session-selector*
 
 %files -f %{po_package}.lang
-%doc AUTHORS COPYING NEWS README
+%doc AUTHORS NEWS README
+%license COPYING
 %doc %{_mandir}/man*/*
 %{_bindir}/*
 %{_libexecdir}/gnome-session-binary
@@ -198,6 +190,28 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 %{_datadir}/glib-2.0/schemas/org.gnome.SessionManager.gschema.xml
 
 %changelog
+* Thu Jul 26 2018 Ray Strode <rstrode@redhat.com> - 3.28.1-5
+- Fix gnome-disk-utility timeout at startup
+  Resolves: #1593215
+- add back session properties icons
+  Related: #1568620
+
+* Tue Jul 24 2018 Ray Strode <rstrode@redhat.com> - 3.28.1-4
+- Fix pot file generation
+  Resolves: #1371019
+
+* Tue Jul 17 2018 Ray Strode <rstrode@redhat.com> - 3.28.1-3
+- Make sure gnome-session-custom-session is only shipped in its subpackage
+  Resolves: #1600560
+
+* Thu Jun 21 2018 Ray Strode <rstrode@redhat.com> - 3.28.1-2
+- Add back GNOME on Wayland session
+  Resolves: #1591614
+
+* Tue Apr 10 2018 Kalev Lember <klember@redhat.com> - 3.28.1-1
+- Update to 3.28.1
+- Resolves: #1568620
+
 * Wed Feb 14 2018 Ray Strode <rstrode@redhat.com> - 3.26.1-11
 - Fix rare crash at start up for VNC sessions
   Resolves: #1545234

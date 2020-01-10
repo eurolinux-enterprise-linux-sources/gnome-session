@@ -1,20 +1,19 @@
-From abf8b3509a0debaf124669d9626a6d9883a1a0d3 Mon Sep 17 00:00:00 2001
+From 489166afdd82af3ec4897c8369a89bbaeffea2d9 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 20 Dec 2013 11:22:07 -0500
 Subject: [PATCH 09/19] Revert "Allow saved-session to be a symlink"
 
 This reverts commit b733c2ee519b65c3c4eab0d0e93056412f995f3f.
 ---
- gnome-session/gsm-session-save.c | 32 ++++++++++++++++++++++++++++----
+ gnome-session/gsm-session-save.c | 33 +++++++++++++++++++++++++++-----
  gnome-session/gsm-util.c         |  6 ++++++
- 2 files changed, 34 insertions(+), 4 deletions(-)
+ 2 files changed, 34 insertions(+), 5 deletions(-)
 
 diff --git a/gnome-session/gsm-session-save.c b/gnome-session/gsm-session-save.c
-index d6000e09..eebc5ff1 100644
+index a71a6181..04b5277c 100644
 --- a/gnome-session/gsm-session-save.c
 +++ b/gnome-session/gsm-session-save.c
-@@ -9,61 +9,61 @@
-  *
+@@ -10,61 +10,61 @@
   * This program is distributed in the hope that it will be useful, but
   * WITHOUT ANY WARRANTY; without even the implied warranty of
   * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
@@ -30,6 +29,7 @@ index d6000e09..eebc5ff1 100644
  #include <glib/gstdio.h>
  #include <gio/gio.h>
  
+ #include "gsm-app.h"
  #include "gsm-util.h"
  #include "gsm-autostart-app.h"
  #include "gsm-client.h"
@@ -47,8 +47,20 @@ index d6000e09..eebc5ff1 100644
 -        const char  *dir;
 +        char        *dir;
          GHashTable  *discard_hash;
+         GsmStore    *app_store;
          GError     **error;
  } SessionSaveData;
+ 
+ static gboolean
+ _app_has_app_id (const char   *id,
+                  GsmApp       *app,
+                  const char   *app_id_a)
+ {
+         const char *app_id_b;
+ 
+         app_id_b = gsm_app_peek_app_id (app);
+         return g_strcmp0 (app_id_a, app_id_b) == 0;
+ }
  
  static gboolean
  save_one_client (char            *id,
@@ -57,27 +69,14 @@ index d6000e09..eebc5ff1 100644
  {
          GsmClient  *client;
          GKeyFile   *keyfile;
+         GsmApp     *app = NULL;
          const char *app_id;
          char       *path = NULL;
          char       *filename = NULL;
          char       *contents = NULL;
          gsize       length = 0;
          char       *discard_exec;
-         GError     *local_error;
- 
-         client = GSM_CLIENT (object);
- 
-         local_error = NULL;
- 
-         keyfile = gsm_client_save (client, &local_error);
- 
-         if (keyfile == NULL || local_error) {
-                 goto out;
-         }
- 
-         contents = g_key_file_to_data (keyfile, &length, &local_error);
-@@ -112,89 +112,113 @@ save_one_client (char            *id,
-         }
+@@ -130,91 +130,114 @@ save_one_client (char            *id,
  
          g_debug ("GsmSessionSave: saved client %s to %s", id, filename);
  
@@ -103,6 +102,7 @@ index d6000e09..eebc5ff1 100644
  
  void
  gsm_session_save (GsmStore  *client_store,
+                   GsmStore  *app_store,
                    GError   **error)
  {
          GSettings       *settings;
@@ -137,6 +137,8 @@ index d6000e09..eebc5ff1 100644
 +        data.dir = tmp_dir;
          data.discard_hash = g_hash_table_new_full (g_str_hash, g_str_equal,
                                                     g_free, NULL);
+         data.app_store = app_store;
+-
 -        /* remove old saved session */
 -        gsm_session_clear_saved_session (save_dir, data.discard_hash);
          data.error = error;
@@ -194,7 +196,7 @@ index d6000e09..eebc5ff1 100644
                          goto out;
  
 diff --git a/gnome-session/gsm-util.c b/gnome-session/gsm-util.c
-index 4772c6e6..30edb577 100644
+index acb446a3..b086568c 100644
 --- a/gnome-session/gsm-util.c
 +++ b/gnome-session/gsm-util.c
 @@ -71,63 +71,69 @@ gsm_util_find_desktop_file_for_app_name (const char *name,
@@ -231,7 +233,7 @@ index 4772c6e6..30edb577 100644
 +        if (g_file_test (dir, G_FILE_TEST_IS_DIR))
 +                return TRUE;
 +
-         if (g_mkdir_with_parents (dir, 0755) == 0)
+         if (g_mkdir_with_parents (dir, 0700) == 0)
                  return TRUE;
  
 +        if (errno == EEXIST)
@@ -268,5 +270,5 @@ index 4772c6e6..30edb577 100644
                  if (dir) {
                          while ((filename = g_dir_read_name (dir))) {
 -- 
-2.14.2
+2.17.0
 

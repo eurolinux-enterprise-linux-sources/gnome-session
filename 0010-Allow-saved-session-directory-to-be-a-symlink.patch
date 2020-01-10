@@ -1,4 +1,4 @@
-From 7c05176e0db2b4d00971a5baf940ad075a088c70 Mon Sep 17 00:00:00 2001
+From 617844d602dd35aceb393b803ed76b15dc125983 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 20 Dec 2013 11:22:53 -0500
 Subject: [PATCH 10/19] Allow saved-session directory to be a symlink
@@ -6,16 +6,15 @@ Subject: [PATCH 10/19] Allow saved-session directory to be a symlink
 This gives us the option of adding a rudimentary session
 chooser later.
 ---
- gnome-session/gsm-session-save.c | 36 ++++++++++++++++++++++++++++++------
+ gnome-session/gsm-session-save.c | 36 ++++++++++++++++++++++++++------
  gnome-session/gsm-util.c         |  6 ------
  2 files changed, 30 insertions(+), 12 deletions(-)
 
 diff --git a/gnome-session/gsm-session-save.c b/gnome-session/gsm-session-save.c
-index eebc5ff1..66914b57 100644
+index 04b5277c..7cbc72fe 100644
 --- a/gnome-session/gsm-session-save.c
 +++ b/gnome-session/gsm-session-save.c
-@@ -148,67 +148,91 @@ gsm_session_save (GsmStore  *client_store,
-          * one shot only)
+@@ -167,67 +167,91 @@ gsm_session_save (GsmStore  *client_store,
           */
          settings = g_settings_new (GSM_MANAGER_SCHEMA);
          g_settings_set_boolean (settings, KEY_AUTOSAVE_ONE_SHOT, FALSE);
@@ -38,6 +37,7 @@ index eebc5ff1..66914b57 100644
          data.dir = tmp_dir;
          data.discard_hash = g_hash_table_new_full (g_str_hash, g_str_equal,
                                                     g_free, NULL);
+         data.app_store = app_store;
          data.error = error;
  
          gsm_store_foreach (client_store,
@@ -113,7 +113,7 @@ index eebc5ff1..66914b57 100644
                  int    argc;
  
 diff --git a/gnome-session/gsm-util.c b/gnome-session/gsm-util.c
-index 30edb577..4772c6e6 100644
+index b086568c..acb446a3 100644
 --- a/gnome-session/gsm-util.c
 +++ b/gnome-session/gsm-util.c
 @@ -71,69 +71,63 @@ gsm_util_find_desktop_file_for_app_name (const char *name,
@@ -150,7 +150,7 @@ index 30edb577..4772c6e6 100644
 -        if (g_file_test (dir, G_FILE_TEST_IS_DIR))
 -                return TRUE;
 -
-         if (g_mkdir_with_parents (dir, 0755) == 0)
+         if (g_mkdir_with_parents (dir, 0700) == 0)
                  return TRUE;
  
 -        if (errno == EEXIST)
@@ -187,5 +187,5 @@ index 30edb577..4772c6e6 100644
                  if (dir) {
                          while ((filename = g_dir_read_name (dir))) {
 -- 
-2.14.2
+2.17.0
 

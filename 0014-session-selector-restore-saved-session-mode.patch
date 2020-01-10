@@ -1,4 +1,4 @@
-From 2a15240b8653b8fe0f0c1e2804d7c2fe8452a604 Mon Sep 17 00:00:00 2001
+From 8ecdc2b44b5c6282722f71dcab0af3c6d27d39d6 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Tue, 7 Jan 2014 21:16:23 -0500
 Subject: [PATCH 14/19] session-selector: restore saved session mode
@@ -13,7 +13,7 @@ session.
  1 file changed, 16 insertions(+), 1 deletion(-)
 
 diff --git a/tools/gnome-session-custom-session b/tools/gnome-session-custom-session
-index 07fdb0cc..358aee01 100644
+index 07fdb0cc..358aee01 100755
 --- a/tools/gnome-session-custom-session
 +++ b/tools/gnome-session-custom-session
 @@ -1,4 +1,19 @@
@@ -38,5 +38,5 @@ index 07fdb0cc..358aee01 100644
 +
 +exec gnome-session "$session_type_argument"
 -- 
-2.14.2
+2.17.0
 

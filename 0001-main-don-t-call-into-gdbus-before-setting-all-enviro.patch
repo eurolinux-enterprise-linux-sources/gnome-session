@@ -1,4 +1,4 @@
-From 2c0087930a188684e61e71d5b5459e4363471196 Mon Sep 17 00:00:00 2001
+From 6294629686aed366210806a911016facd82a7fa7 Mon Sep 17 00:00:00 2001
 From: rpm-build <rpm-build>
 Date: Wed, 14 Feb 2018 09:50:56 -0500
 Subject: [PATCH] main: don't call into gdbus before setting all environment
@@ -12,7 +12,7 @@ doing all our setenv() work.
  1 file changed, 7 insertions(+), 2 deletions(-)
 
 diff --git a/gnome-session/main.c b/gnome-session/main.c
-index e2c3efe..e7a1614 100644
+index b1ac385..bfcce83 100644
 --- a/gnome-session/main.c
 +++ b/gnome-session/main.c
 @@ -244,91 +244,96 @@ initialize_gio (void)
@@ -91,7 +91,7 @@ index e2c3efe..e7a1614 100644
  
          debug_string = g_getenv ("GNOME_SESSION_DEBUG");
          if (debug_string != NULL) {
-                 debug = rpmatch (debug_string) == TRUE || atoi (debug_string) == 1;
+                 debug = atoi (debug_string) == 1;
          }
  
          error = NULL;
@@ -109,7 +109,7 @@ index e2c3efe..e7a1614 100644
           * journald picks ups the nicer "gnome-session" as the program
           * name instead of whatever shell script GDM happened to use.
           */
- #ifdef HAVE_SYSTEMD
+ #ifdef ENABLE_SYSTEMD_JOURNAL
          if (!debug) {
                  int journalfd;
  

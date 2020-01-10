@@ -1,4 +1,4 @@
-From 3e35abd4c7d0aae97d868db6e66706c2ccdeeb11 Mon Sep 17 00:00:00 2001
+From 59a6dacfe90318a12c1a62e793008719b56aadb1 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 20 Dec 2013 10:53:33 -0500
 Subject: [PATCH 15/19] session-selector: refresh from recent glade
@@ -7,7 +7,7 @@ The ui file is rather old.  This commit just opens it up in a recent
 glade and resaves it, so we have a fresh starting point to make
 changes.
 ---
- data/session-selector.ui | 80 ++++++++++++++++++++++++++++++++----------------
+ data/session-selector.ui | 80 +++++++++++++++++++++++++++-------------
  1 file changed, 54 insertions(+), 26 deletions(-)
 
 diff --git a/data/session-selector.ui b/data/session-selector.ui
@@ -265,5 +265,5 @@ index 1534a746..4d1e3009 100644
 +  </object>
  </interface>
 -- 
-2.14.2
+2.17.0
 

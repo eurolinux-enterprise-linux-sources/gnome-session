@@ -1,4 +1,4 @@
-From 0dfb463e126353b17d0c6ec63b99f10bae3fd919 Mon Sep 17 00:00:00 2001
+From 76189ca50976f5f146ad86914a0c5ba932e77171 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Mon, 27 Mar 2017 15:34:51 -0400
 Subject: [PATCH 19/19] capplet: fix disable check items
@@ -87,5 +87,5 @@ index 123ab217..1a0580e6 100644
          }
          g_clear_pointer (&str, g_free);
 -- 
-2.14.2
+2.17.0
 

@@ -1,4 +1,4 @@
-From 12df4f92bff325fbffcaa4eb0ee0392511f6ebb6 Mon Sep 17 00:00:00 2001
+From 976515e5601730a3f74b923eada6805554996794 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Wed, 8 Jan 2014 10:15:29 -0500
 Subject: [PATCH 17/19] session-selector: use classic mode by default
@@ -75,5 +75,5 @@ index a7361a5b..a41cd260 100644
                          return name;
                  }
 -- 
-2.14.2
+2.17.0
 

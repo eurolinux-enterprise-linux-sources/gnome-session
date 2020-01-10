@@ -1,4 +1,4 @@
-From 805c9f995da83c173f9323f55a3f26b627410553 Mon Sep 17 00:00:00 2001
+From 625f6e779a23739b1c8e04c810a17b608df129c6 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 20 Dec 2013 10:53:33 -0500
 Subject: [PATCH 06/19] session-properties: refresh from recent glade
@@ -7,7 +7,7 @@ The ui file is rather old.  This commit just opens it up in a recent
 glade and resaves it, so we have a fresh starting point to make
 changes.
 ---
- data/session-properties.ui | 43 ++++++++++++++++++++++++++++++++++---------
+ data/session-properties.ui | 43 ++++++++++++++++++++++++++++++--------
  1 file changed, 34 insertions(+), 9 deletions(-)
 
 diff --git a/data/session-properties.ui b/data/session-properties.ui
@@ -373,5 +373,5 @@ index 1f0cb9a5..47a30f78 100644
    </object>
  </interface>
 -- 
-2.14.2
+2.17.0
 

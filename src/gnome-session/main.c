@@ -41,7 +41,7 @@
 #include "gsm-system.h"
 #include "gsm-fail-whale.h"
 
-#ifdef HAVE_SYSTEMD
+#ifdef ENABLE_SYSTEMD_JOURNAL
 #include <systemd/sd-journal.h>
 #endif
 
@@ -309,7 +309,7 @@ main (int argc, char **argv)
 
         debug_string = g_getenv ("GNOME_SESSION_DEBUG");
         if (debug_string != NULL) {
-                debug = rpmatch (debug_string) == TRUE || atoi (debug_string) == 1;
+                debug = atoi (debug_string) == 1;
         }
 
         error = NULL;
@@ -327,7 +327,7 @@ main (int argc, char **argv)
          * journald picks ups the nicer "gnome-session" as the program
          * name instead of whatever shell script GDM happened to use.
          */
-#ifdef HAVE_SYSTEMD
+#ifdef ENABLE_SYSTEMD_JOURNAL
         if (!debug) {
                 int journalfd;
 

@@ -3,7 +3,7 @@
 # This file is distributed under the same license as the gnome-session package.
 #
 # Andraž Tori <andraz.tori1@guest.arnes.si> 2000.
-# Matej Urbančič <mateju@svn.gnome.org>, 2007–2017.
+# Matej Urbančič <mateju@svn.gnome.org>, 2007-2016.
 #
 msgid ""
 msgstr ""

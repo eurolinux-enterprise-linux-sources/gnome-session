@@ -1,21 +1,21 @@
-From 119ac97cea3b362e53aaa236f643f9bb916a03cb Mon Sep 17 00:00:00 2001
+From 430d26885e3f42e5eb9807fc62265f03eb72ed60 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 20 Dec 2013 15:07:35 -0500
 Subject: [PATCH 05/19] session-properties: get out of Other
 
 Put it in the menus next to Settings and Software
 ---
- data/session-properties.desktop.in.in | 2 +-
+ data/session-properties.desktop.in | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/data/session-properties.desktop.in.in b/data/session-properties.desktop.in.in
-index 3dc7b033..dcfe2f84 100644
---- a/data/session-properties.desktop.in.in
-+++ b/data/session-properties.desktop.in.in
+diff --git a/data/session-properties.desktop.in b/data/session-properties.desktop.in
+index dcd39ca5..2c86b6b6 100644
+--- a/data/session-properties.desktop.in
++++ b/data/session-properties.desktop.in
 @@ -1,15 +1,15 @@
  [Desktop Entry]
- _Name=Startup Applications
- _Comment=Choose what applications to start when you log in
+ Name=Startup Applications
+ Comment=Choose what applications to start when you log in
  Exec=gnome-session-properties
  Icon=session-properties
  Terminal=false
@@ -30,5 +30,5 @@ index 3dc7b033..dcfe2f84 100644
  X-GNOME-Bugzilla-Component=gnome-session-properties
  X-GNOME-Bugzilla-Version=@VERSION@
 -- 
-2.14.2
+2.17.0
 

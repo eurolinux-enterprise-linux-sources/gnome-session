@@ -1,4 +1,4 @@
-From 808e1598dc50484f62998b4a9e94e956f028d362 Mon Sep 17 00:00:00 2001
+From 3e893278df0743bb1682f7bca88d16c90b8c0341 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 8 May 2015 16:27:15 -0400
 Subject: [PATCH 03/19] Revert "Rename the desktop file to
@@ -6,154 +6,91 @@ Subject: [PATCH 03/19] Revert "Rename the desktop file to
 
 This reverts commit ac9fd0dc97a17674cb082f80df0b1fcc45bc92bf.
 ---
- configure.ac                                                            | 2 +-
- data/Makefile.am                                                        | 2 +-
- ...ession-properties.desktop.in.in => session-properties.desktop.in.in} | 0
- po/POTFILES.in                                                          | 1 +
- po/POTFILES.skip                                                        | 1 +
- 5 files changed, 4 insertions(+), 2 deletions(-)
- rename data/{gnome-session-properties.desktop.in.in => session-properties.desktop.in.in} (100%)
+ data/meson.build                                              | 2 +-
+ ...properties.desktop.in.in => session-properties.desktop.in} | 4 ++--
+ po/POTFILES.in                                                | 2 +-
+ po/POTFILES.skip                                              | 1 +
+ 4 files changed, 5 insertions(+), 4 deletions(-)
+ rename data/{gnome-session-properties.desktop.in.in => session-properties.desktop.in} (81%)
 
-diff --git a/configure.ac b/configure.ac
-index b3f285ed..5182c09e 100644
---- a/configure.ac
-+++ b/configure.ac
-@@ -343,61 +343,61 @@ if test $enable_ipv6 = yes; then
-   dnl =================================================================
-   dnl Now we would check for specific function like getaddrinfo.
-   dnl =================================================================
-   have_getaddrinfo=no
-   if test $have_ipv6=yes; then
-     AC_CHECK_FUNC(getaddrinfo, have_getaddrinfo=yes)
-     if test $have_getaddrinfo != yes; then
-       # getaddrinfo is not in the default libraries.  See if it's in some other.
-       for lib in bsd socket inet; do
-         AC_CHECK_LIB($lib, getaddrinfo, [LIBS="$LIBS -l$lib";have_getaddrinfo=yes; break])
-       done
-     fi
-     if test $have_getaddrinfo=yes; then
-       AC_DEFINE(ENABLE_IPV6, 1, [Define if IPV6 is supported])
-       have_full_ipv6=yes
-     fi
-   fi
- fi
- dnl ==============================================================================
- dnl End of IPv6 checks
- dnl ==============================================================================
+diff --git a/data/meson.build b/data/meson.build
+index c5b2b0f7..3077b19e 100644
+--- a/data/meson.build
++++ b/data/meson.build
+@@ -73,42 +73,42 @@ configure_file(
  
- AC_CONFIG_FILES([
- Makefile
- capplet/Makefile
- doc/Makefile
- doc/dbus/Makefile
- doc/dbus/gnome-session.xml
- doc/man/Makefile
- data/Makefile
--data/gnome-session-properties.desktop.in
-+data/session-properties.desktop.in
- data/org.gnome.SessionManager.gschema.xml
- data/icons/Makefile
- data/icons/16x16/Makefile
- data/icons/22x22/Makefile
- data/icons/24x24/Makefile
- data/icons/32x32/Makefile
- data/icons/48x48/Makefile
- data/icons/scalable/Makefile
- data/icons/symbolic/Makefile
- gnome-session/Makefile
- tools/Makefile
- po/Makefile.in
- ])
- AC_OUTPUT
+ install_data(
+   'gnome-session.convert',
+   install_dir: join_paths(session_datadir, 'GConf', 'gsettings')
+ )
  
- dnl ---------------------------------------------------------------------------
- dnl - Show summary
- dnl ---------------------------------------------------------------------------
+ data = files('hardware-compatibility')
+ data += files('session-properties.ui')
  
- echo "
-               gnome-session $VERSION
-               `echo gnome-session $VERSION | sed "s/./=/g"`
+ if enable_session_selector
+   data += files('session-selector.ui')
  
-         prefix:                   ${prefix}
-         exec_prefix:              ${exec_prefix}
-         libdir:                   ${libdir}
-         bindir:                   ${bindir}
-         sbindir:                  ${sbindir}
-         sysconfdir:               ${sysconfdir}
-         localstatedir:            ${localstatedir}
-diff --git a/data/Makefile.am b/data/Makefile.am
-index b5c3f5ec..0bb25c06 100644
---- a/data/Makefile.am
-+++ b/data/Makefile.am
-@@ -1,58 +1,58 @@
- SUBDIRS = icons
+   desktop = 'gnome-custom-session.desktop'
  
- uidir = $(pkgdatadir)
- ui_DATA = \
- 	session-properties.ui
- 
- if BUILD_SESSION_SELECTOR
- ui_DATA += session-selector.ui
+   i18n.merge_file(
+     desktop,
+     type: 'desktop',
+     input: desktop + '.in',
+     output: desktop,
+     po_dir: po_dir,
+     install: true,
+     install_dir: join_paths(session_datadir, 'xsessions')
+   )
  endif
  
- hwcompatdir = $(pkgdatadir)
- hwcompat_DATA = hardware-compatibility
+ install_data(
+   data,
+   install_dir: session_pkgdatadir
+ )
  
- xsessiondir = $(datadir)/xsessions
- xsession_in_files = gnome.desktop.in gnome-xorg.desktop.in
+-desktop = 'gnome-session-properties.desktop'
++desktop = 'session-properties.desktop'
  
- if BUILD_SESSION_SELECTOR
- xsession_in_files += gnome-custom-session.desktop.in
- endif
+ i18n.merge_file(
+   desktop,
+   type: 'desktop',
+   input: desktop + '.in',
+   output: desktop,
+   po_dir: po_dir,
+   install: true,
+   install_dir: join_paths(session_datadir, 'applications')
+ )
  
- xsession_DATA = $(xsession_in_files:.desktop.in=.desktop)
- 
- wayland_sessiondir = $(datadir)/wayland-sessions
- wayland_session_in_files = gnome.desktop.in
- wayland_session_DATA = $(wayland_session_in_files:.desktop.in=.desktop)
- 
- desktopdir = $(datadir)/applications
--desktop_in_files = gnome-session-properties.desktop.in
-+desktop_in_files = session-properties.desktop.in
- desktop_DATA = $(desktop_in_files:.desktop.in=.desktop)
- 
- sessiondir = $(datadir)/gnome-session/sessions
- session_in_in_files = gnome.session.desktop.in.in gnome-dummy.session.desktop.in.in
- session_in_files = $(session_in_in_files:.session.desktop.in.in=.session.desktop.in)
- session_DATA = $(session_in_files:.session.desktop.in=.session)
- 
- %.session.desktop.in: %.session.desktop.in.in Makefile
- 	$(AM_V_GEN)sed \
- 		-e "s|\@LIBEXECDIR\@|$(libexecdir)|" \
- 		$< > $@
- 
- %.session: %.session.desktop.in   $(INTLTOOL_MERGE) $(wildcard $(top_srcdir)/po/*.po) ; LC_ALL=C $(INTLTOOL_MERGE) -d -u -c $(top_builddir)/po/.intltool-merge-cache $(top_srcdir)/po $< $@
- 
- @INTLTOOL_DESKTOP_RULE@
- @INTLTOOL_XML_NOMERGE_RULE@
- 
- gsettings_SCHEMAS = org.gnome.SessionManager.gschema.xml
- @GSETTINGS_RULES@
- 
- migrationdir = $(datadir)/GConf/gsettings
- dist_migration_DATA = gnome-session.convert
- 
- EXTRA_DIST =					\
- 	$(xsession_in_files)			\
- 	$(session_in_in_files)			\
- 	$(wayland_session_in_files)		\
- 	$(gsettings_SCHEMAS:.xml=.xml.in)	\
- 	session-selector.ui			\
- 	gnome-custom-session.desktop.in		\
-diff --git a/data/gnome-session-properties.desktop.in.in b/data/session-properties.desktop.in.in
-similarity index 100%
+diff --git a/data/gnome-session-properties.desktop.in.in b/data/session-properties.desktop.in
+similarity index 81%
 rename from data/gnome-session-properties.desktop.in.in
-rename to data/session-properties.desktop.in.in
+rename to data/session-properties.desktop.in
+index 3dc7b033..dcd39ca5 100644
+--- a/data/gnome-session-properties.desktop.in.in
++++ b/data/session-properties.desktop.in
+@@ -1,15 +1,15 @@
+ [Desktop Entry]
+-_Name=Startup Applications
+-_Comment=Choose what applications to start when you log in
++Name=Startup Applications
++Comment=Choose what applications to start when you log in
+ Exec=gnome-session-properties
+ Icon=session-properties
+ Terminal=false
+ Type=Application
+ StartupNotify=true
+ Categories=GTK;GNOME;Settings;X-GNOME-PersonalSettings;
+ OnlyShowIn=GNOME;Unity;
+ NoDisplay=true
+ X-GNOME-Bugzilla-Bugzilla=GNOME
+ X-GNOME-Bugzilla-Product=gnome-session
+ X-GNOME-Bugzilla-Component=gnome-session-properties
+ X-GNOME-Bugzilla-Version=@VERSION@
 diff --git a/po/POTFILES.in b/po/POTFILES.in
-index 5cb5123d..08d2eb06 100644
+index 87555685..e8f0e6eb 100644
 --- a/po/POTFILES.in
 +++ b/po/POTFILES.in
-@@ -1,24 +1,25 @@
+@@ -1,24 +1,24 @@
  # List of source files containing translatable strings.
  # Please keep this file sorted alphabetically.
  capplet/gsm-app-dialog.c
@@ -165,10 +102,10 @@ index 5cb5123d..08d2eb06 100644
  data/gnome-xorg.desktop.in
  data/gnome-dummy.session.desktop.in.in
  data/gnome.session.desktop.in.in
- data/gnome-session-properties.desktop.in.in
- [type: gettext/glade]data/session-selector.ui
-+data/session-properties.desktop.in.in
- [type: gettext/glade]data/session-properties.ui
+-data/gnome-session-properties.desktop.in.in
++data/session-properties.desktop.in
+ data/session-selector.ui
+ data/session-properties.ui
  gnome-session/gsm-fail-whale-dialog.c
  gnome-session/gsm-manager.c
  gnome-session/gsm-process-helper.c
@@ -179,17 +116,3 @@ index 5cb5123d..08d2eb06 100644
  tools/gnome-session-inhibit.c
  tools/gnome-session-selector.c
  tools/gnome-session-quit.c
-diff --git a/po/POTFILES.skip b/po/POTFILES.skip
-index 91b41569..e6470914 100644
---- a/po/POTFILES.skip
-+++ b/po/POTFILES.skip
-@@ -1,5 +1,6 @@
- # List of source files containing translatable strings that should not be
- # translated.
- # Please keep this file sorted alphabetically.
- data/gnome-dummy.session.desktop.in
- data/gnome.session.desktop.in
-+data/session-properties.desktop.in
--- 
-2.14.2
-

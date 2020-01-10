@@ -1,8 +1,63 @@
 ==============
-Version 3.26.0
+Version 3.28.1
 ==============
 
-	* Log warning fix
+	* Tell libICE to stop opening a TCP socket
+	* Shore up permissions of .config
+	* Translation updates
+
+==============
+Version 3.28.0
+==============
+
+	* Translation updates
+
+===============
+Version 3.27.92
+===============
+
+	* Translation updates
+
+===============
+Version 3.27.91
+===============
+
+	* Translation updates
+
+=================
+Version 3.27.90.1
+=================
+
+	* Add back deprecated environment variable to fix
+	  GNOME on systems that have proxies set up.
+
+===============
+Version 3.27.90
+===============
+
+	* Session saving fix
+	* Remove dropped g-s-d plugin
+	* Translation updates
+
+==============
+Version 3.27.4
+==============
+
+	* GLES fixes
+	* Make systemd journal configurable again
+	* switch from intltool to gettext
+	* Fix wayland session file
+	* Translation updates
+
+==============
+Version 3.27.3
+==============
+
+	* Drop deprecated bits
+	* Port to meson
+	* Fix crash at shutdown
+	* Fix session saving
+	* BSD fixes
 	* Translation updates
 
 ==============

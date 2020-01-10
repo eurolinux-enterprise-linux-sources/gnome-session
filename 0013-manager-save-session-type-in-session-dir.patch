@@ -1,4 +1,4 @@
-From b92add119aa5b9813556db26477170dd39eca5b6 Mon Sep 17 00:00:00 2001
+From 2dad276ed4db5ee510689f41cd96180415ac4745 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 20 Dec 2013 15:32:04 -0500
 Subject: [PATCH 13/19] manager: save session type in session dir
@@ -7,15 +7,15 @@ If a user saved their session when in classic mode, make sure we
 record that information so subsequent calls to gnome-session will
 restore classic mode.
 ---
- gnome-session/gsm-manager.c      | 21 ++++++++++++++++++--
+ gnome-session/gsm-manager.c      | 21 ++++++++++++++--
  gnome-session/gsm-manager.h      |  1 +
- gnome-session/gsm-session-save.c | 41 +++++++++++++++++++++++++++++++++++++---
- gnome-session/gsm-session-save.h |  5 +++--
- gnome-session/main.c             | 11 ++++++++++-
- 5 files changed, 71 insertions(+), 8 deletions(-)
+ gnome-session/gsm-session-save.c | 43 +++++++++++++++++++++++++++++---
+ gnome-session/gsm-session-save.h |  7 +++---
+ gnome-session/main.c             | 11 +++++++-
+ 5 files changed, 73 insertions(+), 10 deletions(-)
 
 diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
-index 6630aab8..135392fd 100644
+index 31dc67db..325c6c46 100644
 --- a/gnome-session/gsm-manager.c
 +++ b/gnome-session/gsm-manager.c
 @@ -1260,61 +1260,61 @@ finish_pending_save_invocations (GsmManager *manager)
@@ -50,7 +50,7 @@ index 6630aab8..135392fd 100644
          }
  
 -        gsm_session_save (manager->priv->clients, &error);
-+        gsm_session_save (manager->priv->clients, manager->priv->session_name, &error);
++        gsm_session_save (manager->priv->clients, manager->priv->apps, manager->priv->session_name, &error);
  
          if (error) {
                  g_warning ("Error saving session: %s", error->message);
@@ -190,8 +190,8 @@ index 6630aab8..135392fd 100644
          }
  
          error = NULL;
--        gsm_session_save (manager->priv->clients, &error);
-+        gsm_session_save (manager->priv->clients, manager->priv->session_name, &error);
+-        gsm_session_save (manager->priv->clients, manager->priv->apps, &error);
++        gsm_session_save (manager->priv->clients, manager->priv->apps, manager->priv->session_name, &error);
  
          if (error) {
                  g_warning ("Error saving session: %s", error->message);
@@ -280,10 +280,10 @@ index a8de58de..fcf36019 100644
  
  #endif /* __GSM_MANAGER_H */
 diff --git a/gnome-session/gsm-session-save.c b/gnome-session/gsm-session-save.c
-index 66914b57..78b64197 100644
+index 7cbc72fe..22706953 100644
 --- a/gnome-session/gsm-session-save.c
 +++ b/gnome-session/gsm-session-save.c
-@@ -1,73 +1,105 @@
+@@ -1,75 +1,107 @@
  /* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
   * gsm-session-save.c
   * Copyright (C) 2008 Lucas Rocha.
@@ -310,6 +310,7 @@ index 66914b57..78b64197 100644
  #include <glib/gstdio.h>
  #include <gio/gio.h>
  
+ #include "gsm-app.h"
  #include "gsm-util.h"
  #include "gsm-autostart-app.h"
  #include "gsm-client.h"
@@ -326,6 +327,7 @@ index 66914b57..78b64197 100644
  typedef struct {
          char        *dir;
          GHashTable  *discard_hash;
+         GsmStore    *app_store;
          GError     **error;
  } SessionSaveData;
  
@@ -360,12 +362,24 @@ index 66914b57..78b64197 100644
 +}
 +
  static gboolean
+ _app_has_app_id (const char   *id,
+                  GsmApp       *app,
+                  const char   *app_id_a)
+ {
+         const char *app_id_b;
+ 
+         app_id_b = gsm_app_peek_app_id (app);
+         return g_strcmp0 (app_id_a, app_id_b) == 0;
+ }
+ 
+ static gboolean
  save_one_client (char            *id,
                   GObject         *object,
                   SessionSaveData *data)
  {
          GsmClient  *client;
          GKeyFile   *keyfile;
+         GsmApp     *app = NULL;
          const char *app_id;
          char       *path = NULL;
          char       *filename = NULL;
@@ -377,19 +391,7 @@ index 66914b57..78b64197 100644
          client = GSM_CLIENT (object);
  
          local_error = NULL;
- 
-         keyfile = gsm_client_save (client, &local_error);
- 
-         if (keyfile == NULL || local_error) {
-                 goto out;
-         }
- 
-         contents = g_key_file_to_data (keyfile, &length, &local_error);
- 
-         if (local_error) {
-                 goto out;
-         }
-@@ -107,112 +139,114 @@ save_one_client (char            *id,
+@@ -124,114 +156,116 @@ save_one_client (char            *id,
                                                GSM_AUTOSTART_APP_DISCARD_KEY,
                                                NULL);
          if (discard_exec) {
@@ -421,8 +423,10 @@ index 66914b57..78b64197 100644
  
  void
 -gsm_session_save (GsmStore  *client_store,
+-                  GsmStore  *app_store,
 -                  GError   **error)
 +gsm_session_save (GsmStore    *client_store,
++                  GsmStore    *app_store,
 +                  const char  *type,
 +                  GError     **error)
  {
@@ -457,6 +461,7 @@ index 66914b57..78b64197 100644
          data.dir = tmp_dir;
          data.discard_hash = g_hash_table_new_full (g_str_hash, g_str_equal,
                                                     g_free, NULL);
+         data.app_store = app_store;
          data.error = error;
  
          gsm_store_foreach (client_store,
@@ -507,7 +512,7 @@ index 66914b57..78b64197 100644
  
          g_hash_table_destroy (data.discard_hash);
          g_free (tmp_dir);
-@@ -294,31 +328,32 @@ gsm_session_clear_saved_session (const char *directory,
+@@ -313,31 +347,32 @@ gsm_session_clear_saved_session (const char *directory,
  
          while ((filename = g_dir_read_name (dir))) {
                  char *path = g_build_filename (directory,
@@ -541,10 +546,10 @@ index 66914b57..78b64197 100644
 +        clear_session_type (save_dir);
  }
 diff --git a/gnome-session/gsm-session-save.h b/gnome-session/gsm-session-save.h
-index e623260f..c91b5615 100644
+index f55c9c16..b32673c4 100644
 --- a/gnome-session/gsm-session-save.h
 +++ b/gnome-session/gsm-session-save.h
-@@ -1,33 +1,34 @@
+@@ -1,34 +1,35 @@
  /* gsm-session-save.h
   * Copyright (C) 2008 Lucas Rocha.
   *
@@ -572,8 +577,10 @@ index e623260f..c91b5615 100644
  G_BEGIN_DECLS
  
 -void      gsm_session_save                 (GsmStore  *client_store,
+-                                            GsmStore  *app_store,
 -                                            GError   **error);
 +void      gsm_session_save                 (GsmStore    *client_store,
++                                            GsmStore    *app_store,
 +                                            const char  *type,
 +                                            GError     **error);
  void      gsm_session_save_clear           (void);
@@ -582,7 +589,7 @@ index e623260f..c91b5615 100644
  
  #endif /* __GSM_SESSION_SAVE_H__ */
 diff --git a/gnome-session/main.c b/gnome-session/main.c
-index e2c3efef..6e697678 100644
+index b1ac3850..cee385d9 100644
 --- a/gnome-session/main.c
 +++ b/gnome-session/main.c
 @@ -119,61 +119,70 @@ sigusr2_cb (gpointer data)
@@ -658,5 +665,5 @@ index e2c3efef..6e697678 100644
  
  static gboolean
 -- 
-2.14.2
+2.17.0
 

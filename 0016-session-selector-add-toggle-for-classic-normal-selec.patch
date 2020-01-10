@@ -1,4 +1,4 @@
-From f0f0898da1c1e28d4ad6d6c17ba559e59780bd21 Mon Sep 17 00:00:00 2001
+From 9be62bd711a09cdab0cb7f27faa1504b5afe7c76 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Tue, 7 Jan 2014 21:02:02 -0500
 Subject: [PATCH 16/19] session-selector: add toggle for classic/normal
@@ -8,8 +8,8 @@ Since we offer both classic mode and regular mode when
 not using the session selector, we should also offer it
 when using the session selector.
 ---
- data/session-selector.ui       |  39 ++++++++++++++-
- tools/gnome-session-selector.c | 106 +++++++++++++++++++++++++++++++++++++++++
+ data/session-selector.ui       |  39 +++++++++++-
+ tools/gnome-session-selector.c | 106 +++++++++++++++++++++++++++++++++
  2 files changed, 143 insertions(+), 2 deletions(-)
 
 diff --git a/data/session-selector.ui b/data/session-selector.ui
@@ -600,5 +600,5 @@ index 53822f6c..a7361a5b 100644
          return 0;
  }
 -- 
-2.14.2
+2.17.0
 
