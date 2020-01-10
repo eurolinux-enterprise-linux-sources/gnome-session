@@ -1,4 +1,4 @@
-From 5732c282f1cb2f485bd1d3a7b0ce391ab7709d81 Mon Sep 17 00:00:00 2001
+From 2a087ede1b20e8dcac1c37c0b280f9bf6be7c93b Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Wed, 13 May 2015 10:56:09 -0400
 Subject: [PATCH 04/19] stop using gsm_util_get_current_desktop
@@ -437,5 +437,5 @@ index c92b8dad..123ab217 100644
          char          *filename;
          char          *basename;
 -- 
-2.12.0
+2.14.2
 

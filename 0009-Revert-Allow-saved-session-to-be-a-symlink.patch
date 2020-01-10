@@ -1,4 +1,4 @@
-From 43ef133022ec1c25d1626a58fd8c3c8349d5d041 Mon Sep 17 00:00:00 2001
+From abf8b3509a0debaf124669d9626a6d9883a1a0d3 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 20 Dec 2013 11:22:07 -0500
 Subject: [PATCH 09/19] Revert "Allow saved-session to be a symlink"
@@ -194,7 +194,7 @@ index d6000e09..eebc5ff1 100644
                          goto out;
  
 diff --git a/gnome-session/gsm-util.c b/gnome-session/gsm-util.c
-index e30cf912..13f674cb 100644
+index 4772c6e6..30edb577 100644
 --- a/gnome-session/gsm-util.c
 +++ b/gnome-session/gsm-util.c
 @@ -71,63 +71,69 @@ gsm_util_find_desktop_file_for_app_name (const char *name,
@@ -268,5 +268,5 @@ index e30cf912..13f674cb 100644
                  if (dir) {
                          while ((filename = g_dir_read_name (dir))) {
 -- 
-2.12.0
+2.14.2
 

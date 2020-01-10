@@ -317,11 +317,11 @@ setup_window (GsmFailWhaleDialog *fail_dialog)
         gtk_box_pack_start (GTK_BOX (box), label, FALSE, FALSE, 0);
 
         if (!priv->allow_logout)
-                message_label = gtk_label_new (_("A problem has occurred and the system can't recover. Please contact a system administrator"));
+                message_label = gtk_label_new (_("A problem has occurred and the system can’t recover. Please contact a system administrator"));
         else if (priv->extensions)
-                message_label = gtk_label_new (_("A problem has occurred and the system can't recover. All extensions have been disabled as a precaution."));
+                message_label = gtk_label_new (_("A problem has occurred and the system can’t recover. All extensions have been disabled as a precaution."));
         else
-                message_label = gtk_label_new (_("A problem has occurred and the system can't recover.\nPlease log out and try again."));
+                message_label = gtk_label_new (_("A problem has occurred and the system can’t recover.\nPlease log out and try again."));
 
         gtk_label_set_justify (GTK_LABEL (message_label), GTK_JUSTIFY_CENTER);
         gtk_label_set_line_wrap (GTK_LABEL (message_label), TRUE);
@@ -371,13 +371,20 @@ int main (int argc, char *argv[])
         bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
         textdomain (GETTEXT_PACKAGE);
 
-        gtk_init_with_args (&argc, &argv, " - fail whale",
-                            entries, GETTEXT_PACKAGE,
-                            &error);
-         if (error != NULL) {
-                 g_warning ("%s", error->message);
-                 exit (1);
-         }
+        if (!gtk_init_with_args (&argc, &argv, " - fail whale",
+                                 entries, GETTEXT_PACKAGE,
+                                 &error)) {
+            if (error != NULL) {
+                g_warning ("%s", error->message);
+                exit (1);
+            }
+
+            /* display server probably went away. Could be for legitimate reasons, could be for
+             * unexpected reasons.  If it went away unexpectantly, that's logged elsewhere, so
+             * let's not add noise by logging here.
+             */
+            return 0;
+        }
 
         fail_dialog = g_object_new (GSM_TYPE_FAIL_WHALE_DIALOG, NULL);
         fail_dialog->priv->debug_mode = debug_mode;

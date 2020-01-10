@@ -1,4 +1,4 @@
-From 0399cc2e36daaec2ea70c0f32866fb37f08ad4b2 Mon Sep 17 00:00:00 2001
+From cae19300c8035b84c71f6ba5fb17d86add2465dd Mon Sep 17 00:00:00 2001
 From: Josselin Mouette <joss@malsain.org>
 Date: Mon, 21 Jun 2010 15:22:23 -0400
 Subject: [PATCH 08/19] Add "Remember Currently Running Applications" button
@@ -100,7 +100,8 @@ index 33812b8b..d2be778b 100644
          STORE_COL_DESCRIPTION,
          STORE_COL_APP,
          STORE_COL_SEARCH,
-@@ -431,64 +438,118 @@ on_edit_app_clicked (GtkWidget           *widget,
+@@ -430,65 +437,119 @@ on_edit_app_clicked (GtkWidget           *widget,
+                 char       *exec;
                  char       *comment;
  
                  edit_dialog = gsm_app_dialog_new (gsp_app_get_name (app),
@@ -130,7 +131,7 @@ index 33812b8b..d2be778b 100644
          on_edit_app_clicked (NULL, dialog);
  }
  
- static void
++static void
 +session_saved_message (GsmPropertiesDialog *dialog,
 +                       const char *msg,
 +                       gboolean is_error)
@@ -163,7 +164,7 @@ index 33812b8b..d2be778b 100644
 +        g_object_unref (proxy);
 +}
 +
-+static void
+ static void
  on_save_session_clicked (GtkWidget           *widget,
                           GsmPropertiesDialog *dialog)
  {
@@ -221,7 +222,7 @@ index 33812b8b..d2be778b 100644
  
          gtk_tree_model_filter_set_visible_column (GTK_TREE_MODEL_FILTER (tree_filter),
 diff --git a/configure.ac b/configure.ac
-index cc554a8a..04a25fc8 100644
+index 5182c09e..73e69bc7 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -51,60 +51,61 @@ if test "$enable_session_selector" = yes; then
@@ -274,16 +275,16 @@ index cc554a8a..04a25fc8 100644
                [enable_gconf=$enableval],
                [enable_gconf=auto])
  
- PKG_CHECK_MODULES(GCONF, gconf-2.0, [have_gconf=yes], [have_gconf=no])
+ if test x$enable_gconf != xno ; then
+         PKG_CHECK_MODULES(GCONF, gconf-2.0, [have_gconf=yes], [have_gconf=no])
  
- if test x$enable_gconf = xauto ; then
-         enable_gconf=$have_gconf
- elif test x$enable_gconf = xyes -a x$have_gconf = xno ; then
-         AC_MSG_ERROR([GConf support explicitly required, but gconf not found])
- fi
+         if test x$enable_gconf = xyes -a x$have_gconf = xno ; then
+             AC_MSG_ERROR([GConf support explicitly required, but gconf not found])
+         fi
  
- if test x$enable_gconf = xyes ; then
-         AC_DEFINE([HAVE_GCONF], [1], [Define if we support gconf-based autostart])
+         if test x$have_gconf = xyes ; then
+             AC_DEFINE([HAVE_GCONF], [1], [Define if we support gconf-based autostart])
+         fi
  fi
  
 diff --git a/data/session-properties.ui b/data/session-properties.ui
@@ -576,10 +577,10 @@ index cd7c06d8..f79896b3 100644
  
  #endif /* __GSM_CLIENT_H__ */
 diff --git a/gnome-session/gsm-dbus-client.c b/gnome-session/gsm-dbus-client.c
-index 6f5099f9..3c5f7504 100644
+index dcf96f0b..050ea18f 100644
 --- a/gnome-session/gsm-dbus-client.c
 +++ b/gnome-session/gsm-dbus-client.c
-@@ -299,60 +299,73 @@ gsm_dbus_client_get_property (GObject    *object,
+@@ -300,60 +300,73 @@ gsm_dbus_client_get_property (GObject    *object,
          case PROP_BUS_NAME:
                  g_value_set_string (value, self->priv->bus_name);
                  break;
@@ -653,7 +654,7 @@ index 6f5099f9..3c5f7504 100644
  }
  
  static GsmClientRestartStyle
-@@ -392,60 +405,61 @@ static gboolean
+@@ -393,60 +406,61 @@ static gboolean
  dbus_client_end_session (GsmClient                *client,
                           GsmClientEndSessionFlag   flags,
                           GError                  **error)
@@ -716,7 +717,7 @@ index 6f5099f9..3c5f7504 100644
                                 "bus-name", bus_name,
                                 NULL);
 diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
-index ce2ffbcf..711961d6 100644
+index e2fad3b1..825a6846 100644
 --- a/gnome-session/gsm-manager.c
 +++ b/gnome-session/gsm-manager.c
 @@ -54,60 +54,61 @@
@@ -781,7 +782,7 @@ index ce2ffbcf..711961d6 100644
          GSM_MANAGER_LOGOUT_REBOOT,
          GSM_MANAGER_LOGOUT_REBOOT_INTERACT,
          GSM_MANAGER_LOGOUT_SHUTDOWN,
-@@ -1134,60 +1135,123 @@ end_session_or_show_shell_dialog (GsmManager *manager)
+@@ -1172,60 +1173,123 @@ end_session_or_show_shell_dialog (GsmManager *manager)
                          end_phase (manager);
                  }
                  break;
@@ -905,7 +906,7 @@ index ce2ffbcf..711961d6 100644
          manager->priv->query_timeout_id = 0;
  
          g_debug ("GsmManager: query end session timed out");
-@@ -1214,60 +1278,75 @@ _on_query_end_session_timeout (GsmManager *manager)
+@@ -1252,60 +1316,75 @@ _on_query_end_session_timeout (GsmManager *manager)
                          bus_name = NULL;
                  }
  
@@ -981,7 +982,7 @@ index ce2ffbcf..711961d6 100644
  }
  
  static void
-@@ -1810,67 +1889,86 @@ maybe_save_session (GsmManager *manager)
+@@ -1848,67 +1927,86 @@ maybe_save_session (GsmManager *manager)
                  return;
  
          /* We only allow session saving when session is running or when
@@ -1070,7 +1071,8 @@ index ce2ffbcf..711961d6 100644
                  }
  
                  cookie = _generate_unique_cookie (manager);
-@@ -1931,84 +2029,97 @@ on_client_end_session_response (GsmClient  *client,
+@@ -1968,85 +2066,98 @@ on_client_end_session_response (GsmClient  *client,
+         _handle_client_end_session_response (manager,
                                               client,
                                               is_ok,
                                               do_last,
@@ -1100,7 +1102,7 @@ index ce2ffbcf..711961d6 100644
          }
  }
  
- static void
++static void
 +on_xsmp_client_save_request (GsmXSMPClient *client,
 +                             gboolean       show_dialog,
 +                             GsmManager    *manager)
@@ -1109,7 +1111,7 @@ index ce2ffbcf..711961d6 100644
 +        gsm_manager_save_session (manager, NULL);
 +}
 +
-+static void
+ static void
  on_store_client_added (GsmStore   *store,
                         const char *id,
                         GsmManager *manager)
@@ -1168,7 +1170,8 @@ index ce2ffbcf..711961d6 100644
          if (store != NULL) {
                  g_object_ref (store);
          }
-@@ -2588,60 +2699,95 @@ gsm_manager_initialization_error (GsmExportedManager    *skeleton,
+@@ -2625,60 +2736,95 @@ gsm_manager_initialization_error (GsmExportedManager    *skeleton,
+                                   gboolean               fatal,
                                    GsmManager            *manager)
  {
          if (manager->priv->phase != GSM_MANAGER_PHASE_INITIALIZATION) {
@@ -1198,7 +1201,7 @@ index ce2ffbcf..711961d6 100644
          request_logout (manager, mode);
  }
  
- gboolean
++gboolean
 +gsm_manager_save_session (GsmManager *manager,
 +                          GError     **error)
 +{
@@ -1233,7 +1236,7 @@ index ce2ffbcf..711961d6 100644
 +        }
 +}
 +
-+gboolean
+ gboolean
  gsm_manager_logout (GsmManager *manager,
                      guint logout_mode,
                      GError **error)
@@ -1263,7 +1266,6 @@ index ce2ffbcf..711961d6 100644
  
          default:
                  g_debug ("Unknown logout mode option");
- 
 diff --git a/gnome-session/gsm-manager.h b/gnome-session/gsm-manager.h
 index bc440cb0..4d14aa34 100644
 --- a/gnome-session/gsm-manager.h
@@ -1718,5 +1720,5 @@ index 580ec356..29eb0990 100644
                  <doc:definition>Normal.</doc:definition>
                </doc:item>
 -- 
-2.12.0
+2.14.2
 

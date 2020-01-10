@@ -1,4 +1,4 @@
-From 813c3f933584b9a11f88ab3bd26fc266ffac28c8 Mon Sep 17 00:00:00 2001
+From 3e35abd4c7d0aae97d868db6e66706c2ccdeeb11 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 20 Dec 2013 10:53:33 -0500
 Subject: [PATCH 15/19] session-selector: refresh from recent glade
@@ -265,5 +265,5 @@ index 1534a746..4d1e3009 100644
 +  </object>
  </interface>
 -- 
-2.12.0
+2.14.2
 

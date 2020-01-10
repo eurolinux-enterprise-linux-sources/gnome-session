@@ -1,4 +1,4 @@
-From 92c8574d86c70e8a595dfbfdab461c7b990d2fe1 Mon Sep 17 00:00:00 2001
+From 7553acfe86151ed6bc6649f3e16e2a42c6435930 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 20 Dec 2013 11:32:52 -0500
 Subject: [PATCH 12/19] make save-session stall until it finishes
@@ -10,7 +10,7 @@ Subject: [PATCH 12/19] make save-session stall until it finishes
  3 files changed, 53 insertions(+), 8 deletions(-)
 
 diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
-index 711961d6..3c6bb7f4 100644
+index 825a6846..6630aab8 100644
 --- a/gnome-session/gsm-manager.c
 +++ b/gnome-session/gsm-manager.c
 @@ -113,60 +113,61 @@ typedef enum
@@ -75,7 +75,8 @@ index 711961d6..3c6bb7f4 100644
  
  enum {
          PROP_0,
-@@ -1165,90 +1166,124 @@ query_end_session_complete (GsmManager *manager)
+@@ -1202,91 +1203,125 @@ query_end_session_complete (GsmManager *manager)
+ 
  static gboolean
  _client_request_save (GsmClient            *client,
                        ClientEndSessionData *data)
@@ -105,7 +106,7 @@ index 711961d6..3c6bb7f4 100644
          return _client_request_save (client, data);
  }
  
- static void
++static void
 +fail_pending_save_invocations (GsmManager *manager,
 +                               GError     *error)
 +{
@@ -136,7 +137,7 @@ index 711961d6..3c6bb7f4 100644
 +        manager->priv->pending_save_invocations = NULL;
 +}
 +
-+static void
+ static void
  query_save_session_complete (GsmManager *manager)
  {
          GError *error = NULL;
@@ -200,7 +201,7 @@ index 711961d6..3c6bb7f4 100644
  {
          GSList *l;
  
-@@ -2699,92 +2734,101 @@ gsm_manager_initialization_error (GsmExportedManager    *skeleton,
+@@ -2737,92 +2772,101 @@ gsm_manager_initialization_error (GsmExportedManager    *skeleton,
                                    GsmManager            *manager)
  {
          if (manager->priv->phase != GSM_MANAGER_PHASE_INITIALIZATION) {
@@ -424,5 +425,5 @@ index 29eb0990..ac73adc9 100644
          <doc:description>
            <doc:para>Request a logout dialog</doc:para>
 -- 
-2.12.0
+2.14.2
 

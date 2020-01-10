@@ -4,11 +4,11 @@
 
 Summary: GNOME session manager
 Name: gnome-session
-Version: 3.22.3
-Release: 4%{?dist}
+Version: 3.26.1
+Release: 11%{?dist}
 URL: http://www.gnome.org
 #VCS: git:git://git.gnome.org/gnome-session
-Source0: http://download.gnome.org/sources/gnome-session/3.22/%{name}-%{version}.tar.xz
+Source0: http://download.gnome.org/sources/gnome-session/3.26/%{name}-%{version}.tar.xz
 
 # Blacklist NV30: https://bugzilla.redhat.com/show_bug.cgi?id=745202
 Patch00:gnome-session-3.3.92-nv30.patch
@@ -36,7 +36,10 @@ Patch18: 0017-session-selector-use-classic-mode-by-default.patch
 Patch19: 0018-manager-port-away-from-dbus-glib-to-GDBus.patch
 Patch20: 0019-capplet-fix-disable-check-items.patch
 
-Patch30: 0001-fail-whale-handle-X-server-dying-before-startup.patch
+Patch30: 0001-save-make-sure-app-state-is-written-into-desktop-fil.patch
+Patch31: 0002-autostart-ensure-gnome-shell-and-mutter-get-right-au.patch
+
+Patch40: 0001-main-don-t-call-into-gdbus-before-setting-all-enviro.patch
 
 License: GPLv2+
 Group: User Interface/Desktops
@@ -98,6 +101,15 @@ Requires: dconf
 gnome-session manages a GNOME desktop or GDM login session. It starts up
 the other core GNOME components and handles logout and saving the session.
 
+%package wayland-session
+Summary: Desktop file for gnome-session (Wayland)
+Group: User Interface/Desktops
+Requires: gnome-session = %{version}-%{release}
+Requires: xorg-x11-server-Xwayland
+
+%description wayland-session
+Desktop file to add GNOME (Wayland)  to display manager session menu.
+
 %package xsession
 Summary: Desktop file for gnome-session
 Group: User Interface/Desktops
@@ -132,8 +144,9 @@ make %{?_smp_mflags} V=1
 
 %make_install
 
-rm -rf $RPM_BUILD_ROOT%{_datadir}/wayland-sessions
-rm -rf $RPM_BUILD_ROOT%{_datadir}/xsessions/gnome-xorg.desktop
+mv $RPM_BUILD_ROOT%{_datadir}/xsessions/gnome-xorg.desktop \
+   $RPM_BUILD_ROOT%{_datadir}/wayland-sessions/gnome-wayland.desktop
+sed -i -e 's/Xorg/Wayland/g' $RPM_BUILD_ROOT%{_datadir}/wayland-sessions/gnome-wayland.desktop
 
 %find_lang %{po_package}
 
@@ -152,6 +165,9 @@ fi
 %posttrans
 gtk-update-icon-cache %{_datadir}/icons/hicolor &>/dev/null || :
 glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
+
+%files wayland-session
+%{_datadir}/wayland-sessions/*
 
 %files xsession
 %{_datadir}/xsessions/*
@@ -182,6 +198,40 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 %{_datadir}/glib-2.0/schemas/org.gnome.SessionManager.gschema.xml
 
 %changelog
+* Wed Feb 14 2018 Ray Strode <rstrode@redhat.com> - 3.26.1-11
+- Fix rare crash at start up for VNC sessions
+  Resolves: #1545234
+
+* Fri Jan 19 2018 Ray Strode <rstrode@redhat.com> - 3.26.1-10
+- Correct app id test in upgrade compat fix for wayland
+  sessions.
+  Related: #1529175
+
+* Thu Jan 18 2018 Ray Strode <rstrode@redhat.com> - 3.26.1-9
+- Fix wayland when user has saved sessions
+  Resolves: #1529175
+
+* Fri Nov 10 2017 Ray Strode <rstrode@redhat.com> 3.26.1-8
+- New sed incantation is still overzealous.  Rework how
+  gnome-wayland session file is generated.
+  Resolves: #1510391
+
+* Tue Nov 07 2017 Ray Strode <rstrode@redhat.com> - 3.26.1-7
+- Fix sed script so we don't change DesktopNames (oops)
+  Related: #1482140
+  Resolves: 1510391
+
+* Mon Nov 06 2017 Ray Strode <rstrode@redhat.com> - 3.26.1-6
+- Add Requires for Xwayland to wayland subpackage
+  Related: #1482140
+  Resolves: 1509247
+
+* Thu Oct 19 2017 Ray Strode <rstrode@redhat.com> - 3.26.1-1
+- add wayland session file
+  Resolves: #1482140
+- update to 3.26.1 to work with wayland sessions
+  Resolves: 1504156
+
 * Tue May 30 2017 Ray Strode <rstrode@redhat.com> - 3.22.3-4
 - fix crash in fail whale
   Resolves: #1392970

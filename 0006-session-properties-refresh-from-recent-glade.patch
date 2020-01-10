@@ -1,4 +1,4 @@
-From faf13c2b486153683337064824712a440b158424 Mon Sep 17 00:00:00 2001
+From 805c9f995da83c173f9323f55a3f26b627410553 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 20 Dec 2013 10:53:33 -0500
 Subject: [PATCH 06/19] session-properties: refresh from recent glade
@@ -373,5 +373,5 @@ index 1f0cb9a5..47a30f78 100644
    </object>
  </interface>
 -- 
-2.12.0
+2.14.2
 

@@ -78,8 +78,6 @@ on_name_lost (GDBusConnection *connection,
               const char *name,
               gpointer    data)
 {
-        GsmManager *manager = (GsmManager *)data;
-
         if (connection == NULL) {
                 g_warning ("Lost name on bus: %s", name);
                 gsm_fail_whale_dialog_we_failed (TRUE, TRUE, NULL);
@@ -126,6 +124,14 @@ sigusr1_cb (gpointer data)
 }
 
 static void
+on_name_acquired (GDBusConnection *connection,
+                  const char *name,
+                  gpointer data)
+{
+        gsm_manager_start (manager);
+}
+
+static void
 create_manager (void)
 {
         GsmStore *client_store;
@@ -148,7 +154,6 @@ create_manager (void)
         }
 
         _gsm_manager_set_renderer (manager, gl_renderer);
-        gsm_manager_start (manager);
 }
 
 static void
@@ -166,7 +171,7 @@ acquire_name (void)
                                GSM_DBUS_NAME,
                                G_BUS_NAME_OWNER_FLAGS_NONE,
                                on_bus_acquired,
-                               NULL,
+                               on_name_acquired,
                                on_name_lost,
                                NULL, NULL);
 }
@@ -251,7 +256,7 @@ initialize_gio (void)
         }
 
         if (disable_fuse) {
-                g_setenv ("GVFS_DISABLE_FUSE", use_vfs, TRUE);
+                g_setenv ("GVFS_DISABLE_FUSE", disable_fuse, TRUE);
                 g_free (disable_fuse);
         } else {
                 g_unsetenv ("GVFS_DISABLE_FUSE");
@@ -308,7 +313,7 @@ main (int argc, char **argv)
         }
 
         error = NULL;
-        options = g_option_context_new (_(" - the GNOME session manager"));
+        options = g_option_context_new (_(" — the GNOME session manager"));
         g_option_context_add_main_entries (options, entries, GETTEXT_PACKAGE);
         g_option_context_parse (options, &argc, &argv, &error);
         if (error != NULL) {
@@ -377,6 +382,12 @@ main (int argc, char **argv)
                 exit (1);
         }
 
+        gsm_util_export_activation_environment (NULL);
+
+#ifdef HAVE_SYSTEMD
+        gsm_util_export_user_environment (NULL);
+#endif
+
         {
                 gchar *ibus_path;
 
@@ -405,24 +416,6 @@ main (int argc, char **argv)
         /* We want to use the GNOME menus which has the designed categories.
          */
         gsm_util_setenv ("XDG_MENU_PREFIX", "gnome-");
-
-        /* Tell Qt to try to make Qt applications look like gnome
-         */
-        if (g_getenv ("QT_QPA_PLATFORMTHEME") == NULL) {
-                gsm_util_setenv ("QT_QPA_PLATFORMTHEME", "qgnomeplatform");
-        }
-
-        /* hack to fix keyring until we can reorder things in 3.20
-         * https://bugzilla.gnome.org/show_bug.cgi?id=738205
-         */
-        if (g_strcmp0 (g_getenv ("XDG_SESSION_TYPE"), "wayland") == 0 &&
-            g_getenv ("GSM_SKIP_SSH_AGENT_WORKAROUND") == NULL) {
-                char *ssh_socket;
-
-                ssh_socket = g_build_filename (g_get_user_runtime_dir (), "keyring", "ssh", NULL);
-                gsm_util_setenv ("SSH_AUTH_SOCK", ssh_socket);
-                g_free (ssh_socket);
-        }
 
         gsm_util_set_autostart_dirs (override_autostart_dirs);
         session_name = opt_session_name;

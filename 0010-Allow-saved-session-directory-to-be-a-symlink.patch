@@ -1,4 +1,4 @@
-From 6a7054d12d1177184ed20f1d2263eef476d25b8f Mon Sep 17 00:00:00 2001
+From 7c05176e0db2b4d00971a5baf940ad075a088c70 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 20 Dec 2013 11:22:53 -0500
 Subject: [PATCH 10/19] Allow saved-session directory to be a symlink
@@ -113,7 +113,7 @@ index eebc5ff1..66914b57 100644
                  int    argc;
  
 diff --git a/gnome-session/gsm-util.c b/gnome-session/gsm-util.c
-index 13f674cb..e30cf912 100644
+index 30edb577..4772c6e6 100644
 --- a/gnome-session/gsm-util.c
 +++ b/gnome-session/gsm-util.c
 @@ -71,69 +71,63 @@ gsm_util_find_desktop_file_for_app_name (const char *name,
@@ -187,5 +187,5 @@ index 13f674cb..e30cf912 100644
                  if (dir) {
                          while ((filename = g_dir_read_name (dir))) {
 -- 
-2.12.0
+2.14.2
 

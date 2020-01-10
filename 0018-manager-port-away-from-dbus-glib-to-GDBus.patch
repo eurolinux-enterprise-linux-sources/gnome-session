@@ -1,4 +1,4 @@
-From d8f3c88186a22984b79d5f9f78d6007451ab4e02 Mon Sep 17 00:00:00 2001
+From 916d9ba86cf2020ffedff331397ed02b5e53f030 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Wed, 8 Mar 2017 16:36:44 -0500
 Subject: [PATCH 18/19] manager: port away from dbus-glib to GDBus
@@ -212,7 +212,7 @@ index 51fa5106..04452c1a 100644
  
  static void
 diff --git a/configure.ac b/configure.ac
-index ccbbf970..cc554a8a 100644
+index d0eeab8a..5182c09e 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -21,61 +21,61 @@ LT_PREREQ([2.2.6])
@@ -279,10 +279,10 @@ index ccbbf970..cc554a8a 100644
          gtk+-3.0 >= $GTK3_REQUIRED
  )
 diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
-index 4377fe9b..7c0351a2 100644
+index 135392fd..29c3054d 100644
 --- a/gnome-session/gsm-manager.c
 +++ b/gnome-session/gsm-manager.c
-@@ -1172,78 +1172,78 @@ _client_request_save (GsmClient            *client,
+@@ -1210,78 +1210,78 @@ _client_request_save (GsmClient            *client,
  
          error = NULL;
          ret = gsm_client_request_save (client, data->flags, &error);
@@ -365,7 +365,7 @@ index 4377fe9b..7c0351a2 100644
          if (manager->priv->query_timeout_id > 0) {
                  g_source_remove (manager->priv->query_timeout_id);
                  manager->priv->query_timeout_id = 0;
-@@ -2752,96 +2752,96 @@ gsm_manager_initialization_error (GsmExportedManager    *skeleton,
+@@ -2790,96 +2790,96 @@ gsm_manager_initialization_error (GsmExportedManager    *skeleton,
  {
          if (manager->priv->phase != GSM_MANAGER_PHASE_INITIALIZATION) {
                  g_dbus_method_invocation_return_error (invocation,
@@ -571,7 +571,7 @@ index fcf36019..88a88ccc 100644
  
  #endif /* __GSM_MANAGER_H */
 diff --git a/tools/gnome-session-selector.c b/tools/gnome-session-selector.c
-index 1068dbba..08503a9b 100644
+index a41cd260..6ad307b0 100644
 --- a/tools/gnome-session-selector.c
 +++ b/tools/gnome-session-selector.c
 @@ -7,63 +7,60 @@
@@ -752,5 +752,5 @@ index 1068dbba..08503a9b 100644
  
  int
 -- 
-2.12.0
+2.14.2
 

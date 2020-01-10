@@ -1,4 +1,4 @@
-From a4d8ac3f6c392416b2569b4617ab6ef4a64d53b7 Mon Sep 17 00:00:00 2001
+From e18747f7c52f7d7d56f7d9490f934d59d84f8af9 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 8 May 2015 16:24:59 -0400
 Subject: [PATCH 02/19] Revert "Remove gnome-session-properties"
@@ -19,12 +19,12 @@ This reverts commit ea285af9962313ee2675fff27d3a852bb61e936a.
  capplet/gsp-keyfile.h                       |   65 ++
  capplet/main.c                              |  108 +++
  configure.ac                                |    2 +
- data/Makefile.am                            |    6 +
+ data/Makefile.am                            |    8 +-
  data/gnome-session-properties.desktop.in.in |   15 +
  doc/man/Makefile.am                         |    1 +
  doc/man/gnome-session-properties.1          |   24 +
  po/POTFILES.in                              |    5 +
- 19 files changed, 3780 insertions(+)
+ 19 files changed, 3781 insertions(+), 1 deletion(-)
  create mode 100644 capplet/Makefile.am
  create mode 100644 capplet/gsm-app-dialog.c
  create mode 100644 capplet/gsm-app-dialog.h
@@ -3877,7 +3877,7 @@ index 00000000..3c7177bc
 +        return 0;
 +}
 diff --git a/configure.ac b/configure.ac
-index 776c8208..47caf9c8 100644
+index f57dcf3d..b3f285ed 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -337,65 +337,67 @@ if test $enable_ipv6 = yes; then
@@ -3949,10 +3949,10 @@ index 776c8208..47caf9c8 100644
          sysconfdir:               ${sysconfdir}
          localstatedir:            ${localstatedir}
 diff --git a/data/Makefile.am b/data/Makefile.am
-index a171dfcb..6167d10f 100644
+index 413279a2..b5c3f5ec 100644
 --- a/data/Makefile.am
 +++ b/data/Makefile.am
-@@ -1,68 +1,74 @@
+@@ -1,67 +1,73 @@
  SUBDIRS = icons
  
  uidir = $(pkgdatadir)
@@ -4022,9 +4022,9 @@ index a171dfcb..6167d10f 100644
  	$(session_DATA)
  
  DISTCLEANFILES =				\
- 	$(gsettings_SCHEMAS)			\
-+	$(desktop_in_files)			\
- 	$(wayland_session_in_files)
+-	$(gsettings_SCHEMAS)
++	$(gsettings_SCHEMAS)			\
++	$(desktop_in_files)
  
  -include $(top_srcdir)/git.mk
 diff --git a/data/gnome-session-properties.desktop.in.in b/data/gnome-session-properties.desktop.in.in
@@ -4143,5 +4143,5 @@ index 76882645..5cb5123d 100644
  tools/gnome-session-selector.c
  tools/gnome-session-quit.c
 -- 
-2.12.0
+2.14.2
 

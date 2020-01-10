@@ -1,4 +1,4 @@
-From b6c78c97a1eac2c4c1711cd86ed740cd9d25c9fc Mon Sep 17 00:00:00 2001
+From 2a15240b8653b8fe0f0c1e2804d7c2fe8452a604 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Tue, 7 Jan 2014 21:16:23 -0500
 Subject: [PATCH 14/19] session-selector: restore saved session mode
@@ -38,5 +38,5 @@ index 07fdb0cc..358aee01 100644
 +
 +exec gnome-session "$session_type_argument"
 -- 
-2.12.0
+2.14.2
 

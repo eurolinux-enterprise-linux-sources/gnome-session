@@ -1,20 +1,102 @@
-===============
-Version 3.22.3
-===============
-	* VT switch monitoring improvements	
+==============
+Version 3.26.0
+==============
+
+	* Log warning fix
+	* Translation updates
+
+==============
+Version 3.26.0
+==============
+
 	* Translation updates
 
 ===============
-Version 3.22.2
+Version 3.25.92
 ===============
-	* misc fixes to gnome-session-check-accelerated
+
+	* gnome-session-inhibit fix
 	* Translation updates
 
 ===============
-Version 3.22.1
+Version 3.25.90
 ===============
+
+	* Translation updates
+
+===============
+Version 3.25.4
+===============
+
+	* restart dbus-daemon instead of killing dbus clients at log out
+	* session file updates for latest g-s-d
+	* misc memory fixes
+	* Translation updates
+
+===============
+Version 3.25.3
+===============
+
+	* improved error messages with systemd integration
+	* fix crash in fail whale if X dies
+	* fix warning/crash when iterating over extensions
+	* kill dbus clients at logout
+	* leverage unicode for clarity and aesthetics
+	* BSD support improvements
+	* drop old SSH_AUTH_SOCK on wayland workaround
+	* Translation updates
+
+===============
+Version 3.24.1
+===============
+	- autogoo degooing
+	- race condition fix with startup and owning the dbus name
+
+===============
+Version 3.24.0
+===============
+
+===============
+Version 3.23.92
+===============
+
+	* Translation updates
+
+===============
+Version 3.23.91
+===============
+
+	* Fix VT monitor to work with restrictive SELinux policies
+	* Disable extensions in a less destructive way from fail whale
+	* Add support for absolute paths to AutostartCondition
+	* Translation updates
+
+================
+Version 3.23.4.1
+================
+
+	* Redo login shell for wayland handling to be more functional and crossplatform
+
+===============
+Version 3.23.4
+===============
+
+	* Fix warnings at startup in check accelerated helper
+	* print the renderer under wayland in check accelerated helper
+	* fix gpu info caching logic
+	* better error checking
+	* don't tell Qt applications to look like GNOME anymore
+	* make sure a login shell runs for wayland sessions at startup
+	* Translation updates
+
+===============
+Version 3.23.2
+===============
+
 	* Fix problem when cancelling the power off dialogue
 	* Don't set locale information again after the localeexec wrapper already does
+	* Update session desktop files for gnome-settings-daemon changes, the big
+	  daemon is now split up into smaller daemons
 
 ===============
 Version 3.22.0

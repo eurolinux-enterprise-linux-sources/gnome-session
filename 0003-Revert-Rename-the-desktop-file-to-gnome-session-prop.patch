@@ -1,4 +1,4 @@
-From 99d31512307576e9c06a201728eaa023718d3db7 Mon Sep 17 00:00:00 2001
+From 808e1598dc50484f62998b4a9e94e956f028d362 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 8 May 2015 16:27:15 -0400
 Subject: [PATCH 03/19] Revert "Rename the desktop file to
@@ -15,7 +15,7 @@ This reverts commit ac9fd0dc97a17674cb082f80df0b1fcc45bc92bf.
  rename data/{gnome-session-properties.desktop.in.in => session-properties.desktop.in.in} (100%)
 
 diff --git a/configure.ac b/configure.ac
-index 47caf9c8..cc554a8a 100644
+index b3f285ed..5182c09e 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -343,61 +343,61 @@ if test $enable_ipv6 = yes; then
@@ -82,7 +82,7 @@ index 47caf9c8..cc554a8a 100644
          sysconfdir:               ${sysconfdir}
          localstatedir:            ${localstatedir}
 diff --git a/data/Makefile.am b/data/Makefile.am
-index 6167d10f..e8a0e05e 100644
+index b5c3f5ec..0bb25c06 100644
 --- a/data/Makefile.am
 +++ b/data/Makefile.am
 @@ -1,58 +1,58 @@
@@ -191,5 +191,5 @@ index 91b41569..e6470914 100644
  data/gnome.session.desktop.in
 +data/session-properties.desktop.in
 -- 
-2.12.0
+2.14.2
 

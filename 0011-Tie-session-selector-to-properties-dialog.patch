@@ -1,4 +1,4 @@
-From 9b75d5137aea0a54d8e04f55e31d63e5fa250fc8 Mon Sep 17 00:00:00 2001
+From 63b277e801d8bce92abe4e52f7de4cf059f1f896 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 20 Dec 2013 11:28:53 -0500
 Subject: [PATCH 11/19] Tie session selector to properties dialog
@@ -15,7 +15,7 @@ diff --git a/capplet/gsm-properties-dialog.c b/capplet/gsm-properties-dialog.c
 index d2be778b..51fa5106 100644
 --- a/capplet/gsm-properties-dialog.c
 +++ b/capplet/gsm-properties-dialog.c
-@@ -471,88 +471,114 @@ session_saved_message (GsmPropertiesDialog *dialog,
+@@ -471,87 +471,113 @@ session_saved_message (GsmPropertiesDialog *dialog,
  {
          GtkLabel *label;
          gchar *markup;
@@ -74,7 +74,7 @@ index d2be778b..51fa5106 100644
          }
  }
  
- static void
++static void
 +save_session_from_selector (GsmPropertiesDialog *dialog,
 +                            const char          *program_path)
 +{
@@ -101,7 +101,7 @@ index d2be778b..51fa5106 100644
 +        }
 +}
 +
-+static void
+ static void
  setup_dialog (GsmPropertiesDialog *dialog)
  {
          GtkTreeView       *treeview;
@@ -131,9 +131,8 @@ index d2be778b..51fa5106 100644
          gtk_tree_model_filter_set_visible_column (GTK_TREE_MODEL_FILTER (tree_filter),
                                                    STORE_COL_VISIBLE);
  
-         treeview = GTK_TREE_VIEW (gtk_builder_get_object (dialog->priv->xml,
 diff --git a/configure.ac b/configure.ac
-index 04a25fc8..ccbbf970 100644
+index 73e69bc7..d0eeab8a 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -21,91 +21,90 @@ LT_PREREQ([2.2.6])
@@ -217,16 +216,16 @@ index 04a25fc8..ccbbf970 100644
                [enable_gconf=$enableval],
                [enable_gconf=auto])
  
- PKG_CHECK_MODULES(GCONF, gconf-2.0, [have_gconf=yes], [have_gconf=no])
+ if test x$enable_gconf != xno ; then
+         PKG_CHECK_MODULES(GCONF, gconf-2.0, [have_gconf=yes], [have_gconf=no])
  
- if test x$enable_gconf = xauto ; then
-         enable_gconf=$have_gconf
- elif test x$enable_gconf = xyes -a x$have_gconf = xno ; then
-         AC_MSG_ERROR([GConf support explicitly required, but gconf not found])
- fi
+         if test x$enable_gconf = xyes -a x$have_gconf = xno ; then
+             AC_MSG_ERROR([GConf support explicitly required, but gconf not found])
+         fi
  
- if test x$enable_gconf = xyes ; then
-         AC_DEFINE([HAVE_GCONF], [1], [Define if we support gconf-based autostart])
+         if test x$have_gconf = xyes ; then
+             AC_DEFINE([HAVE_GCONF], [1], [Define if we support gconf-based autostart])
+         fi
  fi
  
 diff --git a/data/session-selector.ui b/data/session-selector.ui
@@ -340,7 +339,7 @@ index d3b8bf3f..d6784d1b 100644
  
  -include $(top_srcdir)/git.mk
 diff --git a/tools/gnome-session-selector.c b/tools/gnome-session-selector.c
-index d7584ffb..8f37eca4 100644
+index 71892c43..53822f6c 100644
 --- a/tools/gnome-session-selector.c
 +++ b/tools/gnome-session-selector.c
 @@ -7,126 +7,133 @@
@@ -453,15 +452,15 @@ index d7584ffb..8f37eca4 100644
          if (user_tried_dot && user_tried_slash) {
              warning_text = g_strdup_printf ("%s\n<small><b>Note:</b> <i>%s</i></small>",
                                              info_text,
-                                             _("Session names are not allowed to start with ‘.’ or contain ‘/’ characters"));
+                                             _("Session names are not allowed to start with “.” or contain “/” characters"));
          } else if (user_tried_dot) {
              warning_text = g_strdup_printf ("%s\n<small><b>Note:</b> <i>%s</i></small>",
                                              info_text,
-                                             _("Session names are not allowed to start with ‘.’"));
+                                             _("Session names are not allowed to start with “.”"));
          } else if (user_tried_slash) {
              warning_text = g_strdup_printf ("%s\n<small><b>Note:</b> <i>%s</i></small>",
                                              info_text,
-                                             _("Session names are not allowed to contain ‘/’ characters"));
+                                             _("Session names are not allowed to contain “/” characters"));
          }
  
          gtk_tree_model_get_iter_first (GTK_TREE_MODEL (store), &iter);
@@ -469,7 +468,7 @@ index d7584ffb..8f37eca4 100644
                  gtk_tree_model_get (GTK_TREE_MODEL (store), &iter, 0, &n, -1);
                  if (strcmp (n, name) == 0) {
                          char *message;
-                         message = g_strdup_printf (_("A session named ‘%s’ already exists"), name);
+                         message = g_strdup_printf (_("A session named “%s” already exists"), name);
                          warning_text = g_strdup_printf ("%s\n<small><b>Note:</b> <i>%s</i></small>", info_text, message);
                          g_free (message);
                          g_free (n);
@@ -479,7 +478,8 @@ index d7584ffb..8f37eca4 100644
          } while (gtk_tree_model_iter_next (GTK_TREE_MODEL (store), &iter));
  
          info_bar = (GtkWidget *) gtk_builder_get_object (builder, "info-bar");
-@@ -182,517 +189,637 @@ populate_session_list (GtkWidget *session_list)
+@@ -181,518 +188,638 @@ populate_session_list (GtkWidget *session_list)
+ 
          default_name = NULL;
          if (readlink (saved_session, last_session, PATH_MAX - 1) > 0) {
                  default_name = g_path_get_basename (last_session);
@@ -509,7 +509,7 @@ index d7584ffb..8f37eca4 100644
          g_free (path);
  }
  
- static char *
++static char *
 +get_last_session (void)
 +{
 +        char *saved_session;
@@ -527,7 +527,7 @@ index d7584ffb..8f37eca4 100644
 +        return name;
 +}
 +
-+static char *
+ static char *
  get_selected_session (void)
  {
          GtkTreeSelection *selection;
@@ -737,7 +737,7 @@ index d7584ffb..8f37eca4 100644
          return result == 0;
  }
  
- static gboolean
+-static gboolean
 -make_session_current (const char *name)
 -{
 -        char *path1;
@@ -756,7 +756,7 @@ index d7584ffb..8f37eca4 100644
 -        return ret;
 -}
 -
--static gboolean
+ static gboolean
  create_and_select_session (const char *name)
  {
          gchar *path;
@@ -820,14 +820,14 @@ index d7584ffb..8f37eca4 100644
          begin_rename ();
  }
  
- static void
++static void
 +on_new_session_clicked (GtkButton *button,
 +                        gpointer   data)
 +{
 +	create_session_and_begin_rename ();
 +}
 +
-+static void
+ static void
  on_selection_changed (GtkTreeSelection *selection,
                        gpointer          data)
  {
@@ -1158,5 +1158,5 @@ index d7584ffb..8f37eca4 100644
          return 0;
  }
 -- 
-2.12.0
+2.14.2
 

@@ -1,4 +1,4 @@
-From d53180ebccd678fae1da76d1defb05a9c73e92fe Mon Sep 17 00:00:00 2001
+From 119ac97cea3b362e53aaa236f643f9bb916a03cb Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 20 Dec 2013 15:07:35 -0500
 Subject: [PATCH 05/19] session-properties: get out of Other
@@ -30,5 +30,5 @@ index 3dc7b033..dcfe2f84 100644
  X-GNOME-Bugzilla-Component=gnome-session-properties
  X-GNOME-Bugzilla-Version=@VERSION@
 -- 
-2.12.0
+2.14.2
 

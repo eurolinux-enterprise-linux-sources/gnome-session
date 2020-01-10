@@ -1,4 +1,4 @@
-From a5a64308ef552d7a1ef4210db9d848c9fd7b3740 Mon Sep 17 00:00:00 2001
+From f0f0898da1c1e28d4ad6d6c17ba559e59780bd21 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Tue, 7 Jan 2014 21:02:02 -0500
 Subject: [PATCH 16/19] session-selector: add toggle for classic/normal
@@ -126,7 +126,7 @@ index 4d1e3009..beab73a1 100644
    </object>
  </interface>
 diff --git a/tools/gnome-session-selector.c b/tools/gnome-session-selector.c
-index 8f37eca4..f7f12e7b 100644
+index 53822f6c..a7361a5b 100644
 --- a/tools/gnome-session-selector.c
 +++ b/tools/gnome-session-selector.c
 @@ -16,60 +16,61 @@
@@ -197,7 +197,7 @@ index 8f37eca4..f7f12e7b 100644
                  gtk_tree_model_get (GTK_TREE_MODEL (store), &iter, 0, &n, -1);
                  if (strcmp (n, name) == 0) {
                          char *message;
-                         message = g_strdup_printf (_("A session named ‘%s’ already exists"), name);
+                         message = g_strdup_printf (_("A session named “%s” already exists"), name);
                          warning_text = g_strdup_printf ("%s\n<small><b>Note:</b> <i>%s</i></small>", info_text, message);
                          g_free (message);
                          g_free (n);
@@ -600,5 +600,5 @@ index 8f37eca4..f7f12e7b 100644
          return 0;
  }
 -- 
-2.12.0
+2.14.2
 

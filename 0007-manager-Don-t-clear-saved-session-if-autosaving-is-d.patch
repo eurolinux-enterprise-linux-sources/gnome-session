@@ -1,4 +1,4 @@
-From b8e1b19177e1bbe866ed5561880eaaa7852d31dd Mon Sep 17 00:00:00 2001
+From eb9b29eeb55c47d691b65b046e31ede815e3d22c Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Fri, 20 Dec 2013 16:14:16 -0500
 Subject: [PATCH 07/19] manager: Don't clear saved session if autosaving is
@@ -11,10 +11,10 @@ we don't wipe that away at log out.
  1 file changed, 1 deletion(-)
 
 diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
-index 012f3d3f..ce2ffbcf 100644
+index bdba38e8..e2fad3b1 100644
 --- a/gnome-session/gsm-manager.c
 +++ b/gnome-session/gsm-manager.c
-@@ -1790,61 +1790,60 @@ on_xsmp_client_register_confirmed (GsmXSMPClient *client,
+@@ -1828,61 +1828,60 @@ on_xsmp_client_register_confirmed (GsmXSMPClient *client,
          app = find_app_for_startup_id (manager, id);
  
          if (app != NULL) {
@@ -77,5 +77,5 @@ index 012f3d3f..ce2ffbcf 100644
                  cancel_end_session (manager);
                  return;
 -- 
-2.12.0
+2.14.2
 

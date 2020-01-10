@@ -1,4 +1,4 @@
-From 8df9a4f1bb272d982d7b63fb2f4c7db92ff55a10 Mon Sep 17 00:00:00 2001
+From 12df4f92bff325fbffcaa4eb0ee0392511f6ebb6 Mon Sep 17 00:00:00 2001
 From: Ray Strode <rstrode@redhat.com>
 Date: Wed, 8 Jan 2014 10:15:29 -0500
 Subject: [PATCH 17/19] session-selector: use classic mode by default
@@ -8,7 +8,7 @@ Subject: [PATCH 17/19] session-selector: use classic mode by default
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/tools/gnome-session-selector.c b/tools/gnome-session-selector.c
-index f7f12e7b..1068dbba 100644
+index a7361a5b..a41cd260 100644
 --- a/tools/gnome-session-selector.c
 +++ b/tools/gnome-session-selector.c
 @@ -16,61 +16,61 @@
@@ -75,5 +75,5 @@ index f7f12e7b..1068dbba 100644
                          return name;
                  }
 -- 
-2.12.0
+2.14.2
 

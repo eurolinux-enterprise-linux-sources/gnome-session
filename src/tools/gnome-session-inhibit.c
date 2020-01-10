@@ -105,7 +105,7 @@ static gboolean inhibit (const gchar       *app_id,
 
 static void usage (void)
 {
-  g_print (_("%s [OPTION...] COMMAND\n"
+  g_print (_("%s [OPTION…] COMMAND\n"
              "\n"
              "Execute COMMAND while inhibiting some session functionality.\n"
              "\n"
@@ -142,7 +142,7 @@ wait_for_child_app (char **argv)
 
   if (pid == 0)
     {
-      execvp (*argv, argv + 1);
+      execvp (*argv, argv);
       g_print (_("Failed to execute %s\n"), *argv);
       exit (1);
     }
