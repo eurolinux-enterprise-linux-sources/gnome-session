@@ -1,0 +1,756 @@
+From d8f3c88186a22984b79d5f9f78d6007451ab4e02 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Wed, 8 Mar 2017 16:36:44 -0500
+Subject: [PATCH 18/19] manager: port away from dbus-glib to GDBus
+
+---
+ capplet/gsm-properties-dialog.c | 52 +++++++++++++++++++++--------------------
+ configure.ac                    |  2 +-
+ gnome-session/gsm-manager.c     | 16 ++++++-------
+ gnome-session/gsm-manager.h     |  3 ++-
+ tools/gnome-session-selector.c  | 48 ++++++++++++++++++++-----------------
+ 5 files changed, 64 insertions(+), 57 deletions(-)
+
+diff --git a/capplet/gsm-properties-dialog.c b/capplet/gsm-properties-dialog.c
+index 51fa5106..04452c1a 100644
+--- a/capplet/gsm-properties-dialog.c
++++ b/capplet/gsm-properties-dialog.c
+@@ -1,66 +1,66 @@
+ /* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
+  *
+  * Copyright (C) 1999 Free Software Foundation, Inc.
+  * Copyright (C) 2007 Vincent Untz.
+  * Copyright (C) 2008 Lucas Rocha.
+  * Copyright (C) 2008 William Jon McCann <jmccann@redhat.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  *
+  * This program is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+  *
+  */
+ 
+ #include "config.h"
+ 
+ #include <glib.h>
+ #include <glib/gi18n.h>
+ #include <gtk/gtk.h>
+ 
++#include <gio/gio.h>
++
+ #include "gsm-properties-dialog.h"
+ #include "gsm-app-dialog.h"
+ #include "gsm-util.h"
+ #include "gsp-app.h"
+ #include "gsp-app-manager.h"
+-#include <dbus/dbus-glib.h>
+-#include <dbus/dbus-glib-lowlevel.h>
+ 
+ #define GSM_SERVICE_DBUS   "org.gnome.SessionManager"
+ #define GSM_PATH_DBUS      "/org/gnome/SessionManager"
+ #define GSM_INTERFACE_DBUS "org.gnome.SessionManager"
+ 
+ #define GSM_PROPERTIES_DIALOG_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), GSM_TYPE_PROPERTIES_DIALOG, GsmPropertiesDialogPrivate))
+ 
+ #define GTKBUILDER_FILE "session-properties.ui"
+ 
+ #define CAPPLET_TREEVIEW_WIDGET_NAME      "session_properties_treeview"
+ #define CAPPLET_ADD_WIDGET_NAME           "session_properties_add_button"
+ #define CAPPLET_DELETE_WIDGET_NAME        "session_properties_delete_button"
+ #define CAPPLET_EDIT_WIDGET_NAME          "session_properties_edit_button"
+ #define CAPPLET_SAVE_WIDGET_NAME          "session_properties_save_button"
+ #define CAPPLET_SESSION_SAVED_WIDGET_NAME "session_properties_session_saved_label"
+ #define CAPPLET_REMEMBER_WIDGET_NAME      "session_properties_remember_toggle"
+ 
+ #define STARTUP_APP_ICON     "system-run"
+ 
+ #define SPC_SETTINGS_SCHEMA          "org.gnome.SessionManager"
+ #define SPC_SETTINGS_AUTOSAVE_KEY    "auto-save-session"
+ 
+ struct GsmPropertiesDialogPrivate
+ {
+         GtkBuilder        *xml;
+         GtkListStore      *list_store;
+         GtkTreeModel      *tree_filter;
+ 
+         GtkTreeView       *treeview;
+         GtkWidget         *add_button;
+@@ -454,101 +454,103 @@ on_edit_app_clicked (GtkWidget           *widget,
+                 g_object_unref (app);
+         }
+ }
+ 
+ static void
+ on_row_activated (GtkTreeView         *tree_view,
+                   GtkTreePath         *path,
+                   GtkTreeViewColumn   *column,
+                   GsmPropertiesDialog *dialog)
+ {
+         on_edit_app_clicked (NULL, dialog);
+ }
+ 
+ static void
+ session_saved_message (GsmPropertiesDialog *dialog,
+                        const char *msg,
+                        gboolean is_error)
+ {
+         GtkLabel *label;
+         gchar *markup;
+         label = GTK_LABEL (gtk_builder_get_object (dialog->priv->xml, CAPPLET_SESSION_SAVED_WIDGET_NAME));
+         if (is_error)
+                 markup = g_markup_printf_escaped ("<span foreground=\"red\">%s</span>", msg);
+         else
+                 markup = g_markup_escape_text (msg, -1);
+         gtk_label_set_markup (label, markup);
+         g_free (markup);
+ }
+ 
+ static void
+-session_saved_cb (DBusGProxy *proxy,
+-                  DBusGProxyCall *call_id,
+-                  void *user_data)
++session_saved_cb (GDBusConnection *conn,
++                  GAsyncResult *result,
++                  gpointer user_data)
+ {
+-        gboolean res;
++        GVariant *reply;
+         GsmPropertiesDialog *dialog = user_data;
++        GError *error = NULL;
+ 
+-        res = dbus_g_proxy_end_call (proxy, call_id, NULL, G_TYPE_INVALID);
+-        if (res)
++        reply = g_dbus_connection_call_finish (conn, result, &error);
++        if (error == NULL)
+                 session_saved_message (dialog, _("Your session has been saved."), FALSE);
+         else
+                 session_saved_message (dialog, _("Failed to save session"), TRUE);
+ 
+-        g_object_unref (proxy);
++        g_clear_error (&error);
++
++        g_variant_unref (reply);
+ }
+ 
+ static void
+ save_session_directly (GsmPropertiesDialog *dialog)
+ {
+-        DBusGConnection *conn;
+-        DBusGProxy *proxy;
+-        DBusGProxyCall *call;
++        GDBusConnection *conn;
+ 
+-        conn = dbus_g_bus_get (DBUS_BUS_SESSION, NULL);
++        conn = g_bus_get_sync (G_BUS_TYPE_SESSION, NULL, NULL);
+         if (conn == NULL) {
+                 session_saved_message (dialog, _("Could not connect to the session bus"), TRUE);
+                 return;
+         }
+ 
+-        proxy = dbus_g_proxy_new_for_name (conn, GSM_SERVICE_DBUS, GSM_PATH_DBUS, GSM_INTERFACE_DBUS);
+-        if (proxy == NULL) {
+-                session_saved_message (dialog, _("Could not connect to the session manager"), TRUE);
+-                return;
+-        }
+-
+-        call = dbus_g_proxy_begin_call (proxy, "SaveSession", session_saved_cb, dialog, NULL, G_TYPE_INVALID);
+-        if (call == NULL) {
+-                session_saved_message (dialog, _("Failed to save session"), TRUE);
+-                g_object_unref (proxy);
+-                return;
+-        }
++        g_dbus_connection_call (conn,
++                                GSM_SERVICE_DBUS,
++                                GSM_PATH_DBUS,
++                                GSM_INTERFACE_DBUS,
++                                "SaveSession",
++                                NULL,
++                                NULL,
++                                G_DBUS_CALL_FLAGS_NONE,
++                                -1,
++                                NULL,
++                                (GAsyncReadyCallback)
++                                session_saved_cb,
++                                dialog);
+ }
+ 
+ static void
+ save_session_from_selector (GsmPropertiesDialog *dialog,
+                             const char          *program_path)
+ {
+         char *command_line = g_strdup_printf ("%s --action save", program_path);
+ 
+         g_spawn_command_line_sync (command_line, NULL, NULL, NULL, NULL);
+ 
+         g_free (command_line);
+ }
+ 
+ static void
+ on_save_session_clicked (GtkWidget           *widget,
+                          GsmPropertiesDialog *dialog)
+ {
+         char *program_path;
+ 
+         program_path = g_find_program_in_path ("gnome-session-selector");
+ 
+         if (program_path != NULL) {
+                 save_session_from_selector (dialog, program_path);
+                 g_free (program_path);
+         } else {
+                 save_session_directly (dialog);
+         }
+ }
+ 
+ static void
+diff --git a/configure.ac b/configure.ac
+index ccbbf970..cc554a8a 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -21,61 +21,61 @@ LT_PREREQ([2.2.6])
+ LT_INIT([dlopen disable-static])
+ 
+ GNOME_MAINTAINER_MODE_DEFINES
+ GNOME_COMPILE_WARNINGS([maximum])
+ 
+ AC_ARG_ENABLE(deprecation_flags,
+               [AS_HELP_STRING([--enable-deprecation-flags],
+                               [use *_DISABLE_DEPRECATED flags @<:@default=no@:>@])],,
+               [enable_deprecation_flags=no])
+ 
+ if test "x$enable_deprecation_flags" = "xyes"; then
+    DISABLE_DEPRECATED_CFLAGS=$DISABLE_DEPRECATED
+    AC_SUBST([DISABLE_DEPRECATED_CFLAGS])
+ fi
+ 
+ GLIB_REQUIRED=2.46.0
+ GTK3_REQUIRED=3.18.0
+ DBUS_GLIB_REQUIRED=0.76
+ UPOWER_REQUIRED=0.9.0
+ JSON_GLIB_REQUIRED=0.10
+ GNOME_DESKTOP_REQUIRED=3.18.0
+ 
+ AC_ARG_ENABLE(session-selector, AS_HELP_STRING([--enable-session-selector],
+                                                [enable building a custom session selector dialog]),
+                                                 enable_session_selector=$enableval,enable_session_selector=no)
+ 
+ AM_CONDITIONAL(BUILD_SESSION_SELECTOR,
+                [test "$enable_session_selector" = yes])
+ 
+ if test "$enable_session_selector" = yes; then
+-        PKG_CHECK_MODULES(SESSION_SELECTOR, gtk+-3.0 gio-2.0 dbus-glib-1 >= $DBUS_GLIB_REQUIRED)
++        PKG_CHECK_MODULES(SESSION_SELECTOR, gtk+-3.0 gio-2.0)
+ fi
+ 
+ dnl ====================================================================
+ dnl Dependency Checks
+ dnl ====================================================================
+ 
+ dnl Standard vertical stacks
+ PKG_CHECK_MODULES(GIO, gio-2.0)
+ PKG_CHECK_MODULES(GIOUNIX, gio-unix-2.0 >= $GLIB_REQUIRED)
+ PKG_CHECK_MODULES(GTK3, gtk+-3.0 >= $GTK3_REQUIRED)
+ 
+ PKG_CHECK_MODULES(GNOME_SESSION,
+         glib-2.0 >= $GLIB_REQUIRED
+         gio-2.0 >= $GLIB_REQUIRED
+         json-glib-1.0 >= $JSON_GLIB_REQUIRED
+         gnome-desktop-3.0 >= $GNOME_DESKTOP_REQUIRED
+ )
+ 
+ dnl We can only support old upower
+ dnl https://bugzilla.gnome.org/show_bug.cgi?id=710383
+ PKG_CHECK_MODULES(UPOWER, upower-glib < 0.99.0, have_old_upower=yes, have_old_upower=no)
+ AS_IF([test x$have_old_upower = xyes], [
+   AC_DEFINE([HAVE_OLD_UPOWER], [1], [Define if we have an older upower])
+ ])
+ AM_CONDITIONAL(HAVE_OLD_UPOWER, test x$have_old_upower = xyes)
+ 
+ PKG_CHECK_MODULES(SESSION_PROPERTIES,
+         glib-2.0 >= $GLIB_REQUIRED
+         gtk+-3.0 >= $GTK3_REQUIRED
+ )
+diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
+index 4377fe9b..7c0351a2 100644
+--- a/gnome-session/gsm-manager.c
++++ b/gnome-session/gsm-manager.c
+@@ -1172,78 +1172,78 @@ _client_request_save (GsmClient            *client,
+ 
+         error = NULL;
+         ret = gsm_client_request_save (client, data->flags, &error);
+         if (ret) {
+                 g_debug ("GsmManager: adding client to query clients: %s", gsm_client_peek_id (client));
+                 data->manager->priv->query_clients = g_slist_prepend (data->manager->priv->query_clients,
+                                                                       client);
+         } else if (error) {
+                 g_debug ("GsmManager: unable to query client: %s", error->message);
+                 g_error_free (error);
+         }
+ 
+         return FALSE;
+ }
+ 
+ static gboolean
+ _client_request_save_helper (const char           *id,
+                              GsmClient            *client,
+                              ClientEndSessionData *data)
+ {
+         return _client_request_save (client, data);
+ }
+ 
+ static void
+ fail_pending_save_invocations (GsmManager *manager,
+                                GError     *error)
+ {
+         GSList *l;
+ 
+         for (l = manager->priv->pending_save_invocations; l != NULL; l = l->next) {
+-                DBusGMethodInvocation *context = l->data;
++                GDBusMethodInvocation *invocation = l->data;
+ 
+-                dbus_g_method_return_error (context, error);
++                g_dbus_method_invocation_return_gerror (invocation, error);
+         }
+ 
+         g_slist_free (manager->priv->pending_save_invocations);
+         manager->priv->pending_save_invocations = NULL;
+ }
+ 
+ static void
+ finish_pending_save_invocations (GsmManager *manager)
+ {
+         GSList *l;
+ 
+         for (l = manager->priv->pending_save_invocations; l != NULL; l = l->next) {
+-                DBusGMethodInvocation *context = l->data;
++                GDBusMethodInvocation *invocation = l->data;
+ 
+-                dbus_g_method_return (context);
++                g_dbus_method_invocation_return_value (invocation, NULL);
+         }
+ 
+         g_slist_free (manager->priv->pending_save_invocations);
+         manager->priv->pending_save_invocations = NULL;
+ }
+ 
+ static void
+ query_save_session_complete (GsmManager *manager)
+ {
+         GError *error = NULL;
+ 
+         if (g_slist_length (manager->priv->next_query_clients) > 0) {
+                 ClientEndSessionData data;
+ 
+                 data.manager = manager;
+                 data.flags = GSM_CLIENT_END_SESSION_FLAG_LAST;
+ 
+                 g_slist_foreach (manager->priv->next_query_clients,
+                                  (GFunc)_client_request_save,
+                                  &data);
+ 
+                 g_slist_free (manager->priv->next_query_clients);
+                 manager->priv->next_query_clients = NULL;
+ 
+                 return;
+         }
+ 
+         if (manager->priv->query_timeout_id > 0) {
+                 g_source_remove (manager->priv->query_timeout_id);
+                 manager->priv->query_timeout_id = 0;
+@@ -2752,96 +2752,96 @@ gsm_manager_initialization_error (GsmExportedManager    *skeleton,
+ {
+         if (manager->priv->phase != GSM_MANAGER_PHASE_INITIALIZATION) {
+                 g_dbus_method_invocation_return_error (invocation,
+                                                        GSM_MANAGER_ERROR,
+                                                        GSM_MANAGER_ERROR_NOT_IN_INITIALIZATION,
+                                                        "InitializationError interface is only available during the Initialization phase");
+                 return TRUE;
+         }
+ 
+         gsm_util_init_error (fatal, "%s", message);
+         gsm_exported_manager_complete_initialization_error (skeleton, invocation);
+ 
+         return TRUE;
+ }
+ 
+ static void
+ user_logout (GsmManager           *manager,
+              GsmManagerLogoutMode  mode)
+ {
+         if (manager->priv->phase >= GSM_MANAGER_PHASE_QUERY_END_SESSION) {
+                 manager->priv->logout_mode = mode;
+                 end_session_or_show_shell_dialog (manager);
+                 return;
+         }
+ 
+         request_logout (manager, mode);
+ }
+ 
+ gboolean
+ gsm_manager_save_session (GsmManager            *manager,
+-                          DBusGMethodInvocation *context)
++                          GDBusMethodInvocation *invocation)
+ {
+         ClientEndSessionData data;
+         GError *error;
+ 
+         g_debug ("GsmManager: SaveSession called");
+ 
+         g_return_val_if_fail (GSM_IS_MANAGER (manager), FALSE);
+ 
+         if (manager->priv->phase != GSM_MANAGER_PHASE_RUNNING) {
+                 error = g_error_new (GSM_MANAGER_ERROR,
+                                      GSM_MANAGER_ERROR_NOT_IN_RUNNING,
+                                      "SaveSession interface is only available during the Running phase");
+-                dbus_g_method_return_error (context, error);
++                g_dbus_method_invocation_return_gerror (invocation, error);
+                 g_error_free (error);
+                 return FALSE;
+         }
+ 
+         data.manager = manager;
+         data.flags = 0;
+         gsm_store_foreach (manager->priv->clients,
+                            (GsmStoreFunc)_client_request_save_helper,
+                            &data);
+ 
+         if (manager->priv->query_clients) {
+                 manager->priv->query_timeout_id = g_timeout_add_seconds (GSM_MANAGER_SAVE_SESSION_TIMEOUT,
+                                                                          (GSourceFunc)_on_query_save_session_timeout,
+                                                                          manager);
+ 
+                 manager->priv->pending_save_invocations = g_slist_prepend (manager->priv->pending_save_invocations,
+-                                                                           context);
++                                                                           invocation);
+ 
+                 return TRUE;
+         } else {
+                 g_debug ("GsmManager: Nothing to save");
+-                dbus_g_method_return (context);
++                g_dbus_method_invocation_return_value (invocation, NULL);
+                 return TRUE;
+         }
+ 
+         return TRUE;
+ }
+ 
+ gboolean
+ gsm_manager_logout (GsmManager *manager,
+                     guint logout_mode,
+                     GError **error)
+ {
+         if (manager->priv->phase < GSM_MANAGER_PHASE_RUNNING) {
+                 g_set_error (error,
+                              GSM_MANAGER_ERROR,
+                              GSM_MANAGER_ERROR_NOT_IN_RUNNING,
+                              "Logout interface is only available after the Running phase starts");
+                 return FALSE;
+         }
+ 
+         if (_log_out_is_locked_down (manager)) {
+                 g_set_error (error,
+                              GSM_MANAGER_ERROR,
+                              GSM_MANAGER_ERROR_LOCKED_DOWN,
+                              "Logout has been locked down");
+                 return FALSE;
+         }
+ 
+         switch (logout_mode) {
+         case GSM_MANAGER_LOGOUT_MODE_NORMAL:
+         case GSM_MANAGER_LOGOUT_MODE_NO_CONFIRMATION:
+diff --git a/gnome-session/gsm-manager.h b/gnome-session/gsm-manager.h
+index fcf36019..88a88ccc 100644
+--- a/gnome-session/gsm-manager.h
++++ b/gnome-session/gsm-manager.h
+@@ -1,54 +1,55 @@
+ /* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
+  *
+  * Copyright (C) 2008 William Jon McCann <jmccann@redhat.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  *
+  * This program is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, see <http://www.gnu.org/licenses/>.
+  *
+  */
+ 
+ 
+ #ifndef __GSM_MANAGER_H
+ #define __GSM_MANAGER_H
+ 
+ #include <glib-object.h>
++#include <gio/gio.h>
+ 
+ #include "gsm-store.h"
+ #include "gsm-manager-logout-mode.h"
+ 
+ G_BEGIN_DECLS
+ 
+ #define GSM_TYPE_MANAGER         (gsm_manager_get_type ())
+ #define GSM_MANAGER(o)           (G_TYPE_CHECK_INSTANCE_CAST ((o), GSM_TYPE_MANAGER, GsmManager))
+ #define GSM_MANAGER_CLASS(k)     (G_TYPE_CHECK_CLASS_CAST((k), GSM_TYPE_MANAGER, GsmManagerClass))
+ #define GSM_IS_MANAGER(o)        (G_TYPE_CHECK_INSTANCE_TYPE ((o), GSM_TYPE_MANAGER))
+ #define GSM_IS_MANAGER_CLASS(k)  (G_TYPE_CHECK_CLASS_TYPE ((k), GSM_TYPE_MANAGER))
+ #define GSM_MANAGER_GET_CLASS(o) (G_TYPE_INSTANCE_GET_CLASS ((o), GSM_TYPE_MANAGER, GsmManagerClass))
+ 
+ typedef struct GsmManagerPrivate GsmManagerPrivate;
+ 
+ typedef struct
+ {
+         GObject            parent;
+         GsmManagerPrivate *priv;
+ } GsmManager;
+ 
+ typedef struct
+ {
+         GObjectClass   parent_class;
+ 
+         void          (* phase_changed)       (GsmManager      *manager,
+                                                const char      *phase);
+ } GsmManagerClass;
+ 
+ typedef enum {
+@@ -98,42 +99,42 @@ GType               gsm_manager_get_type                       (void);
+ GsmManager *        gsm_manager_new                            (GsmStore       *client_store,
+                                                                 gboolean        failsafe);
+ GsmManager *        gsm_manager_get                            (void);
+ 
+ gboolean            gsm_manager_get_failsafe                   (GsmManager     *manager);
+ 
+ gboolean            gsm_manager_add_autostart_app              (GsmManager     *manager,
+                                                                 const char     *path,
+                                                                 const char     *provides);
+ gboolean            gsm_manager_add_required_app               (GsmManager     *manager,
+                                                                 const char     *path,
+                                                                 const char     *provides);
+ gboolean            gsm_manager_add_autostart_apps_from_dir    (GsmManager     *manager,
+                                                                 const char     *path);
+ gboolean            gsm_manager_add_legacy_session_apps        (GsmManager     *manager,
+                                                                 const char     *path);
+ 
+ void                gsm_manager_start                          (GsmManager     *manager);
+ 
+ const char *        _gsm_manager_get_default_session           (GsmManager     *manager);
+ char *              _gsm_manager_get_saved_session             (GsmManager     *manager);
+ 
+ void                _gsm_manager_set_active_session            (GsmManager     *manager,
+                                                                 const char     *session_name,
+                                                                 gboolean        is_fallback);
+ 
+ void                _gsm_manager_set_renderer                  (GsmManager     *manager,
+                                                                 const char     *renderer);
+ 
+ gboolean            gsm_manager_save_session                   (GsmManager     *manager,
+-								DBusGMethodInvocation *context);
++                                                                GDBusMethodInvocation *context);
+ 
+ gboolean            gsm_manager_logout                         (GsmManager     *manager,
+                                                                 guint           logout_mode,
+                                                                 GError        **error);
+ 
+ gboolean            gsm_manager_set_phase                      (GsmManager     *manager,
+                                                                 GsmManagerPhase phase);
+ 
+ G_END_DECLS
+ 
+ #endif /* __GSM_MANAGER_H */
+diff --git a/tools/gnome-session-selector.c b/tools/gnome-session-selector.c
+index 1068dbba..08503a9b 100644
+--- a/tools/gnome-session-selector.c
++++ b/tools/gnome-session-selector.c
+@@ -7,63 +7,60 @@
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  *
+  * This program is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, see <http://www.gnu.org/licenses/>.
+  *
+  * Written by: Matthias Clasen <mclasen@redhat.com>
+  */
+ 
+ #include "config.h"
+ 
+ #include <fcntl.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <unistd.h>
+ 
+ #include <glib.h>
+ #include <gtk/gtk.h>
+ #include <gio/gio.h>
+ 
+ #include <glib/gi18n.h>
+ #include <glib/gstdio.h>
+ 
+-#include <dbus/dbus-glib.h>
+-#include <dbus/dbus-glib-lowlevel.h>
+-
+ #define GSM_SERVICE_DBUS   "org.gnome.SessionManager"
+ #define GSM_PATH_DBUS      "/org/gnome/SessionManager"
+ #define GSM_INTERFACE_DBUS "org.gnome.SessionManager"
+ 
+ #define GSM_MANAGER_SCHEMA        "org.gnome.SessionManager"
+ #define KEY_AUTOSAVE_ONE_SHOT     "auto-save-session-one-shot"
+ #define DEFAULT_SESSION_NAME      "gnome-classic"
+ 
+ static GtkBuilder *builder;
+ static GtkWidget *session_list;
+ static GtkListStore *store;
+ static GtkTreeModelSort *sort_model;
+ static char *info_text;
+ 
+ static void select_session (const char *name);
+ static gboolean make_session_current (const char *name);
+ 
+ static char *
+ get_session_path (const char *name)
+ {
+         return g_build_filename (g_get_user_config_dir (), "gnome-session", name, NULL);
+ }
+ 
+ static char *
+ find_new_session_name (void)
+ {
+         char *name;
+         char *path;
+         int i;
+ 
+@@ -694,86 +691,93 @@ on_row_activated (GtkTreeView       *tree_view,
+         gtk_main_quit ();
+ }
+ 
+ static void
+ auto_save_next_session (void)
+ {
+         GSettings *settings;
+ 
+         settings = g_settings_new (GSM_MANAGER_SCHEMA);
+         g_settings_set_boolean (settings, KEY_AUTOSAVE_ONE_SHOT, TRUE);
+         g_object_unref (settings);
+ }
+ 
+ static void
+ auto_save_next_session_if_needed (void)
+ {
+         char *marker;
+ 
+         marker = g_build_filename (g_get_user_config_dir (),
+                                    "gnome-session", "saved-session",
+                                    ".new-session", NULL);
+ 
+         if (g_file_test (marker, G_FILE_TEST_EXISTS)) {
+                 auto_save_next_session ();
+                 unlink (marker);
+         }
+         g_free (marker);
+ }
+ 
+ static void
+-save_session (void)
++session_saved_cb (GDBusConnection *conn,
++                  GAsyncResult *result)
+ {
+-        DBusGConnection *conn;
+-        DBusGProxy *proxy;
+-        GError *error;
++        GVariant *reply;
+ 
+-        conn = dbus_g_bus_get (DBUS_BUS_SESSION, NULL);
+-        if (conn == NULL) {
+-                g_warning ("Could not connect to the session bus");
+-                return;
+-        }
++        reply = g_dbus_connection_call_finish (conn, result, NULL);
+ 
+-        proxy = dbus_g_proxy_new_for_name (conn, GSM_SERVICE_DBUS, GSM_PATH_DBUS, GSM_INTERFACE_DBUS);
+-        if (proxy == NULL) {
+-                g_warning ("Could not connect to the session manager");
+-                return;
+-        }
++        g_variant_unref (reply);
++}
+ 
+-        error = NULL;
+-        if (!dbus_g_proxy_call (proxy, "SaveSession", &error, G_TYPE_INVALID, G_TYPE_INVALID)) {
+-                g_warning ("Failed to save session: %s", error->message);
+-                g_error_free (error);
++static void
++save_session (void)
++{
++        GDBusConnection *conn;
++
++        conn = g_bus_get_sync (G_BUS_TYPE_SESSION, NULL, NULL);
++        if (conn == NULL) {
+                 return;
+         }
+ 
+-        g_object_unref (proxy);
++        g_dbus_connection_call (conn,
++                                GSM_SERVICE_DBUS,
++                                GSM_PATH_DBUS,
++                                GSM_INTERFACE_DBUS,
++                                "SaveSession",
++                                NULL,
++                                NULL,
++                                G_DBUS_CALL_FLAGS_NONE,
++                                -1,
++                                NULL,
++                                (GAsyncReadyCallback)
++                                session_saved_cb,
++                                NULL);
+ }
+ 
+ static int
+ compare_sessions (GtkTreeModel *model,
+                   GtkTreeIter  *a,
+                   GtkTreeIter  *b,
+                   gpointer      data)
+ {
+     char *name_a, *name_b;
+     int result;
+ 
+     gtk_tree_model_get (model, a, 0, &name_a, -1);
+     gtk_tree_model_get (model, b, 0, &name_b, -1);
+ 
+     result = g_utf8_collate (name_a, name_b);
+ 
+     g_free (name_a);
+     g_free (name_b);
+ 
+     return result;
+ }
+ 
+ static void
+ on_map (GtkWidget *widget,
+         gpointer   data)
+ {
+         gdk_window_focus (gtk_widget_get_window (widget), GDK_CURRENT_TIME);
+ }
+ 
+ int
+-- 
+2.12.0
+

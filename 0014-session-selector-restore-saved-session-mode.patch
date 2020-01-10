@@ -1,0 +1,42 @@
+From b6c78c97a1eac2c4c1711cd86ed740cd9d25c9fc Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Tue, 7 Jan 2014 21:16:23 -0500
+Subject: [PATCH 14/19] session-selector: restore saved session mode
+
+When using the custom session selector, we need to know
+whether to use classic mode or not.
+
+This commit makes us use whatever mode was saved with the
+session.
+---
+ tools/gnome-session-custom-session | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/tools/gnome-session-custom-session b/tools/gnome-session-custom-session
+index 07fdb0cc..358aee01 100644
+--- a/tools/gnome-session-custom-session
++++ b/tools/gnome-session-custom-session
+@@ -1,4 +1,19 @@
+ #! /bin/sh
+ 
+ gnome-session-selector
+-exec gnome-session
++
++type_file="${XDG_CONFIG_HOME:-$HOME/.config}/gnome-session/saved-session/type"
++
++session_type=""
++if [ -e "$type_file" ]; then
++        read session_type < "$type_file"
++fi
++
++session_type_argument=""
++[ -n "$session_type" ] && session_type_argument="--session=$session_type"
++
++if [ "$session_type" = "gnome-classic" ]; then
++        export GNOME_SHELL_SESSION_MODE="classic"
++fi
++
++exec gnome-session "$session_type_argument"
+-- 
+2.12.0
+

@@ -1,0 +1,272 @@
+From 43ef133022ec1c25d1626a58fd8c3c8349d5d041 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Fri, 20 Dec 2013 11:22:07 -0500
+Subject: [PATCH 09/19] Revert "Allow saved-session to be a symlink"
+
+This reverts commit b733c2ee519b65c3c4eab0d0e93056412f995f3f.
+---
+ gnome-session/gsm-session-save.c | 32 ++++++++++++++++++++++++++++----
+ gnome-session/gsm-util.c         |  6 ++++++
+ 2 files changed, 34 insertions(+), 4 deletions(-)
+
+diff --git a/gnome-session/gsm-session-save.c b/gnome-session/gsm-session-save.c
+index d6000e09..eebc5ff1 100644
+--- a/gnome-session/gsm-session-save.c
++++ b/gnome-session/gsm-session-save.c
+@@ -9,61 +9,61 @@
+  *
+  * This program is distributed in the hope that it will be useful, but
+  * WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+  * Lesser General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #include <config.h>
+ 
+ #include <glib.h>
+ #include <glib/gstdio.h>
+ #include <gio/gio.h>
+ 
+ #include "gsm-util.h"
+ #include "gsm-autostart-app.h"
+ #include "gsm-client.h"
+ 
+ #include "gsm-session-save.h"
+ 
+ #define GSM_MANAGER_SCHEMA        "org.gnome.SessionManager"
+ #define KEY_AUTOSAVE_ONE_SHOT     "auto-save-session-one-shot"
+ 
+ 
+ static gboolean gsm_session_clear_saved_session (const char *directory,
+                                                  GHashTable *discard_hash);
+ 
+ typedef struct {
+-        const char  *dir;
++        char        *dir;
+         GHashTable  *discard_hash;
+         GError     **error;
+ } SessionSaveData;
+ 
+ static gboolean
+ save_one_client (char            *id,
+                  GObject         *object,
+                  SessionSaveData *data)
+ {
+         GsmClient  *client;
+         GKeyFile   *keyfile;
+         const char *app_id;
+         char       *path = NULL;
+         char       *filename = NULL;
+         char       *contents = NULL;
+         gsize       length = 0;
+         char       *discard_exec;
+         GError     *local_error;
+ 
+         client = GSM_CLIENT (object);
+ 
+         local_error = NULL;
+ 
+         keyfile = gsm_client_save (client, &local_error);
+ 
+         if (keyfile == NULL || local_error) {
+                 goto out;
+         }
+ 
+         contents = g_key_file_to_data (keyfile, &length, &local_error);
+@@ -112,89 +112,113 @@ save_one_client (char            *id,
+         }
+ 
+         g_debug ("GsmSessionSave: saved client %s to %s", id, filename);
+ 
+ out:
+         if (keyfile != NULL) {
+                 g_key_file_free (keyfile);
+         }
+ 
+         g_free (contents);
+         g_free (filename);
+         g_free (path);
+ 
+         /* in case of any error, stop saving session */
+         if (local_error) {
+                 g_propagate_error (data->error, local_error);
+                 g_error_free (local_error);
+ 
+                 return TRUE;
+         }
+ 
+         return FALSE;
+ }
+ 
+ void
+ gsm_session_save (GsmStore  *client_store,
+                   GError   **error)
+ {
+         GSettings       *settings;
+         const char      *save_dir;
++        char            *tmp_dir;
+         SessionSaveData  data;
+ 
+         g_debug ("GsmSessionSave: Saving session");
+ 
+         /* Clear one shot key autosave in the event its set (so that it's actually
+          * one shot only)
+          */
+         settings = g_settings_new (GSM_MANAGER_SCHEMA);
+         g_settings_set_boolean (settings, KEY_AUTOSAVE_ONE_SHOT, FALSE);
+         g_object_unref (settings);
+ 
+         save_dir = gsm_util_get_saved_session_dir ();
+         if (save_dir == NULL) {
+                 g_warning ("GsmSessionSave: cannot create saved session directory");
+                 return;
+         }
+ 
+-        data.dir = save_dir;
++        tmp_dir = gsm_util_get_empty_tmp_session_dir ();
++        if (tmp_dir == NULL) {
++                g_warning ("GsmSessionSave: cannot create new saved session directory");
++                return;
++        }
++
++        /* save the session in a temp directory, and remember the discard
++         * commands */
++        data.dir = tmp_dir;
+         data.discard_hash = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                                    g_free, NULL);
+-        /* remove old saved session */
+-        gsm_session_clear_saved_session (save_dir, data.discard_hash);
+         data.error = error;
+ 
+         gsm_store_foreach (client_store,
+                            (GsmStoreFunc) save_one_client,
+                            &data);
+ 
++        if (!*error) {
++                /* remove the old saved session */
++                gsm_session_clear_saved_session (save_dir, data.discard_hash);
++
++                /* rename the temp session dir */
++                if (g_file_test (save_dir, G_FILE_TEST_IS_DIR))
++                        g_rmdir (save_dir);
++                g_rename (tmp_dir, save_dir);
++        } else {
++                g_warning ("GsmSessionSave: error saving session: %s", (*error)->message);
++                /* FIXME: we should create a hash table filled with the discard
++                 * commands that are in desktop files from save_dir. */
++                gsm_session_clear_saved_session (tmp_dir, NULL);
++                g_rmdir (tmp_dir);
++        }
++
+         g_hash_table_destroy (data.discard_hash);
++        g_free (tmp_dir);
+ }
+ 
+ static gboolean
+ gsm_session_clear_one_client (const char *filename,
+                               GHashTable *discard_hash)
+ {
+         gboolean  result = TRUE;
+         GKeyFile *key_file;
+         char     *discard_exec = NULL;
+         char    **envp;
+ 
+         g_debug ("GsmSessionSave: removing '%s' from saved session", filename);
+ 
+         envp = (char **) gsm_util_listenv ();
+         key_file = g_key_file_new ();
+         if (g_key_file_load_from_file (key_file, filename,
+                                        G_KEY_FILE_NONE, NULL)) {
+                 char **argv;
+                 int    argc;
+ 
+                 discard_exec = g_key_file_get_string (key_file,
+                                                       G_KEY_FILE_DESKTOP_GROUP,
+                                                       GSM_AUTOSTART_APP_DISCARD_KEY,
+                                                       NULL);
+                 if (!discard_exec)
+                         goto out;
+ 
+                 if (discard_hash && g_hash_table_lookup (discard_hash, discard_exec))
+                         goto out;
+ 
+diff --git a/gnome-session/gsm-util.c b/gnome-session/gsm-util.c
+index e30cf912..13f674cb 100644
+--- a/gnome-session/gsm-util.c
++++ b/gnome-session/gsm-util.c
+@@ -71,63 +71,69 @@ gsm_util_find_desktop_file_for_app_name (const char *name,
+                 g_debug ("GsmUtil: found in XDG dirs: '%s'", app_path);
+         }
+ 
+         /* look for gnome vendor prefix */
+         if (app_path == NULL) {
+                 g_free (desktop_file);
+                 desktop_file = g_strdup_printf ("gnome-%s.desktop", name);
+ 
+                 g_key_file_load_from_dirs (key_file,
+                                            desktop_file,
+                                            (const char **) app_dirs,
+                                            &app_path,
+                                            G_KEY_FILE_NONE,
+                                            NULL);
+                 if (app_path != NULL) {
+                         g_debug ("GsmUtil: found in XDG dirs: '%s'", app_path);
+                 }
+         }
+ 
+         g_free (desktop_file);
+         g_key_file_free (key_file);
+ 
+         g_strfreev (app_dirs);
+ 
+         return app_path;
+ }
+ 
+ static gboolean
+ ensure_dir_exists (const char *dir)
+ {
++        if (g_file_test (dir, G_FILE_TEST_IS_DIR))
++                return TRUE;
++
+         if (g_mkdir_with_parents (dir, 0755) == 0)
+                 return TRUE;
+ 
++        if (errno == EEXIST)
++                return g_file_test (dir, G_FILE_TEST_IS_DIR);
++
+         g_warning ("GsmSessionSave: Failed to create directory %s: %s", dir, strerror (errno));
+ 
+         return FALSE;
+ }
+ 
+ gchar *
+ gsm_util_get_empty_tmp_session_dir (void)
+ {
+         char *tmp;
+         gboolean exists;
+ 
+         tmp = g_build_filename (g_get_user_config_dir (),
+                                 "gnome-session",
+                                 "saved-session.new",
+                                 NULL);
+ 
+         exists = ensure_dir_exists (tmp);
+ 
+         if (G_UNLIKELY (!exists)) {
+                 g_warning ("GsmSessionSave: could not create directory for saved session: %s", tmp);
+                 g_free (tmp);
+                 return NULL;
+         } else {
+                 /* make sure it's empty */
+                 GDir       *dir;
+                 const char *filename;
+ 
+                 dir = g_dir_open (tmp, 0, NULL);
+                 if (dir) {
+                         while ((filename = g_dir_read_name (dir))) {
+-- 
+2.12.0
+

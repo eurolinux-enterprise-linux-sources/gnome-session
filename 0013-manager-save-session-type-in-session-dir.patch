@@ -1,0 +1,662 @@
+From c5ad3fc27895f07f871d94aea69fc4713b258a82 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Fri, 20 Dec 2013 15:32:04 -0500
+Subject: [PATCH 13/19] manager: save session type in session dir
+
+If a user saved their session when in classic mode, make sure we
+record that information so subsequent calls to gnome-session will
+restore classic mode.
+---
+ gnome-session/gsm-manager.c      | 21 ++++++++++++++++++--
+ gnome-session/gsm-manager.h      |  1 +
+ gnome-session/gsm-session-save.c | 41 +++++++++++++++++++++++++++++++++++++---
+ gnome-session/gsm-session-save.h |  5 +++--
+ gnome-session/main.c             | 11 ++++++++++-
+ 5 files changed, 71 insertions(+), 8 deletions(-)
+
+diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
+index 3c6bb7f4..4377fe9b 100644
+--- a/gnome-session/gsm-manager.c
++++ b/gnome-session/gsm-manager.c
+@@ -1222,61 +1222,61 @@ finish_pending_save_invocations (GsmManager *manager)
+         g_slist_free (manager->priv->pending_save_invocations);
+         manager->priv->pending_save_invocations = NULL;
+ }
+ 
+ static void
+ query_save_session_complete (GsmManager *manager)
+ {
+         GError *error = NULL;
+ 
+         if (g_slist_length (manager->priv->next_query_clients) > 0) {
+                 ClientEndSessionData data;
+ 
+                 data.manager = manager;
+                 data.flags = GSM_CLIENT_END_SESSION_FLAG_LAST;
+ 
+                 g_slist_foreach (manager->priv->next_query_clients,
+                                  (GFunc)_client_request_save,
+                                  &data);
+ 
+                 g_slist_free (manager->priv->next_query_clients);
+                 manager->priv->next_query_clients = NULL;
+ 
+                 return;
+         }
+ 
+         if (manager->priv->query_timeout_id > 0) {
+                 g_source_remove (manager->priv->query_timeout_id);
+                 manager->priv->query_timeout_id = 0;
+         }
+ 
+-        gsm_session_save (manager->priv->clients, &error);
++        gsm_session_save (manager->priv->clients, manager->priv->session_name, &error);
+ 
+         if (error) {
+                 g_warning ("Error saving session: %s", error->message);
+                 fail_pending_save_invocations (manager, error);
+                 g_error_free (error);
+         } else {
+                 finish_pending_save_invocations (manager);
+         }
+ }
+ 
+ static guint32
+ generate_cookie (void)
+ {
+         guint32 cookie;
+ 
+         cookie = (guint32)g_random_int_range (1, G_MAXINT32);
+ 
+         return cookie;
+ }
+ 
+ static guint32
+ _generate_unique_cookie (GsmManager *manager)
+ {
+         guint32 cookie;
+ 
+         do {
+                 cookie = generate_cookie ();
+         } while (gsm_store_find (manager->priv->inhibitors, (GsmStoreFunc)_find_by_cookie, &cookie) != NULL);
+ 
+         return cookie;
+@@ -1490,60 +1490,77 @@ debug_app_summary (GsmManager *manager)
+ 
+         g_debug ("GsmManager: App startup summary");
+         for (phase = GSM_MANAGER_PHASE_EARLY_INITIALIZATION; phase < GSM_MANAGER_PHASE_RUNNING; phase++) {
+                 g_debug ("GsmManager: Phase %s", phase_num_to_name (phase));
+                 gsm_store_foreach (manager->priv->apps,
+                                    (GsmStoreFunc)_debug_app_for_phase,
+                                    GUINT_TO_POINTER (phase));
+         }
+ }
+ 
+ void
+ gsm_manager_start (GsmManager *manager)
+ {
+         g_debug ("GsmManager: GSM starting to manage");
+ 
+         g_return_if_fail (GSM_IS_MANAGER (manager));
+ 
+         gsm_xsmp_server_start (manager->priv->xsmp_server);
+         gsm_manager_set_phase (manager, GSM_MANAGER_PHASE_EARLY_INITIALIZATION);
+         debug_app_summary (manager);
+         start_phase (manager);
+ }
+ 
+ const char *
+ _gsm_manager_get_default_session (GsmManager     *manager)
+ {
+         return g_settings_get_string (manager->priv->session_settings,
+                                       KEY_SESSION_NAME);
+ }
+ 
++char *
++_gsm_manager_get_saved_session (GsmManager     *manager)
++{
++        char *file;
++        char *type;
++        gboolean loaded;
++
++        file = g_build_filename (gsm_util_get_saved_session_dir (), "type", NULL);
++        loaded = g_file_get_contents (file, &type, NULL, NULL);
++        g_free (file);
++
++        if (!loaded)
++                return NULL;
++
++        return type;
++}
++
+ void
+ _gsm_manager_set_active_session (GsmManager     *manager,
+                                  const char     *session_name,
+                                  gboolean        is_fallback)
+ {
+         g_free (manager->priv->session_name);
+         manager->priv->session_name = g_strdup (session_name);
+         manager->priv->is_fallback_session = is_fallback;
+ 
+         gsm_exported_manager_set_session_name (manager->priv->skeleton, session_name);
+ }
+ 
+ void
+ _gsm_manager_set_renderer (GsmManager *manager,
+                            const char *renderer)
+ {
+         gsm_exported_manager_set_renderer (manager->priv->skeleton, renderer);
+ }
+ 
+ static gboolean
+ _app_has_app_id (const char   *id,
+                  GsmApp       *app,
+                  const char   *app_id_a)
+ {
+         const char *app_id_b;
+ 
+         app_id_b = gsm_app_peek_app_id (app);
+         return (app_id_b != NULL && strcmp (app_id_a, app_id_b) == 0);
+ }
+ 
+@@ -1908,61 +1925,61 @@ on_xsmp_client_register_confirmed (GsmXSMPClient *client,
+         }
+ }
+ 
+ static gboolean
+ auto_save_is_enabled (GsmManager *manager)
+ {
+         return g_settings_get_boolean (manager->priv->settings, KEY_AUTOSAVE_ONE_SHOT)
+             || g_settings_get_boolean (manager->priv->settings, KEY_AUTOSAVE);
+ }
+ 
+ static void
+ maybe_save_session (GsmManager *manager)
+ {
+         GError *error;
+ 
+         if (gsm_system_is_login_session (manager->priv->system))
+                 return;
+ 
+         /* We only allow session saving when session is running or when
+          * logging out */
+         if (manager->priv->phase != GSM_MANAGER_PHASE_RUNNING &&
+             manager->priv->phase != GSM_MANAGER_PHASE_END_SESSION) {
+                 return;
+         }
+ 
+         if (!auto_save_is_enabled (manager)) {
+                 return;
+         }
+ 
+         error = NULL;
+-        gsm_session_save (manager->priv->clients, &error);
++        gsm_session_save (manager->priv->clients, manager->priv->session_name, &error);
+ 
+         if (error) {
+                 g_warning ("Error saving session: %s", error->message);
+                 g_error_free (error);
+         }
+ }
+ 
+ static void
+ _handle_client_end_session_response (GsmManager *manager,
+                                      GsmClient  *client,
+                                      gboolean    is_ok,
+                                      gboolean    do_last,
+                                      gboolean    cancel,
+                                      const char *reason)
+ {
+         /* just ignore if we are not yet running */
+         if (manager->priv->phase < GSM_MANAGER_PHASE_RUNNING) {
+                 return;
+         }
+ 
+         g_debug ("GsmManager: Response from end session request: is-ok=%d do-last=%d cancel=%d reason=%s", is_ok, do_last, cancel, reason ? reason :"");
+ 
+         if (manager->priv->phase == GSM_MANAGER_PHASE_RUNNING) {
+                 /* Ignore responses when no requests were sent */
+                 if (manager->priv->query_clients == NULL) {
+                         return;
+                 }
+ 
+                 manager->priv->query_clients = g_slist_remove (manager->priv->query_clients, client);
+ 
+diff --git a/gnome-session/gsm-manager.h b/gnome-session/gsm-manager.h
+index a8de58de..fcf36019 100644
+--- a/gnome-session/gsm-manager.h
++++ b/gnome-session/gsm-manager.h
+@@ -88,51 +88,52 @@ typedef enum
+         GSM_MANAGER_ERROR_INVALID_OPTION,
+         GSM_MANAGER_ERROR_LOCKED_DOWN,
+         GSM_MANAGER_NUM_ERRORS
+ } GsmManagerError;
+ 
+ #define GSM_MANAGER_ERROR gsm_manager_error_quark ()
+ GQuark              gsm_manager_error_quark                    (void);
+ 
+ GType               gsm_manager_get_type                       (void);
+ 
+ GsmManager *        gsm_manager_new                            (GsmStore       *client_store,
+                                                                 gboolean        failsafe);
+ GsmManager *        gsm_manager_get                            (void);
+ 
+ gboolean            gsm_manager_get_failsafe                   (GsmManager     *manager);
+ 
+ gboolean            gsm_manager_add_autostart_app              (GsmManager     *manager,
+                                                                 const char     *path,
+                                                                 const char     *provides);
+ gboolean            gsm_manager_add_required_app               (GsmManager     *manager,
+                                                                 const char     *path,
+                                                                 const char     *provides);
+ gboolean            gsm_manager_add_autostart_apps_from_dir    (GsmManager     *manager,
+                                                                 const char     *path);
+ gboolean            gsm_manager_add_legacy_session_apps        (GsmManager     *manager,
+                                                                 const char     *path);
+ 
+ void                gsm_manager_start                          (GsmManager     *manager);
+ 
+ const char *        _gsm_manager_get_default_session           (GsmManager     *manager);
++char *              _gsm_manager_get_saved_session             (GsmManager     *manager);
+ 
+ void                _gsm_manager_set_active_session            (GsmManager     *manager,
+                                                                 const char     *session_name,
+                                                                 gboolean        is_fallback);
+ 
+ void                _gsm_manager_set_renderer                  (GsmManager     *manager,
+                                                                 const char     *renderer);
+ 
+ gboolean            gsm_manager_save_session                   (GsmManager     *manager,
+ 								DBusGMethodInvocation *context);
+ 
+ gboolean            gsm_manager_logout                         (GsmManager     *manager,
+                                                                 guint           logout_mode,
+                                                                 GError        **error);
+ 
+ gboolean            gsm_manager_set_phase                      (GsmManager     *manager,
+                                                                 GsmManagerPhase phase);
+ 
+ G_END_DECLS
+ 
+ #endif /* __GSM_MANAGER_H */
+diff --git a/gnome-session/gsm-session-save.c b/gnome-session/gsm-session-save.c
+index 66914b57..78b64197 100644
+--- a/gnome-session/gsm-session-save.c
++++ b/gnome-session/gsm-session-save.c
+@@ -1,73 +1,105 @@
+ /* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
+  * gsm-session-save.c
+  * Copyright (C) 2008 Lucas Rocha.
+  *
+  * This program is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU General Public License as
+  * published by the Free Software Foundation; either version 2 of the
+  * License, or (at your option) any later version.
+  *
+  * This program is distributed in the hope that it will be useful, but
+  * WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+  * Lesser General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #include <config.h>
+ 
++#include <string.h>
++
+ #include <glib.h>
+ #include <glib/gstdio.h>
+ #include <gio/gio.h>
+ 
+ #include "gsm-util.h"
+ #include "gsm-autostart-app.h"
+ #include "gsm-client.h"
+ 
+ #include "gsm-session-save.h"
+ 
+ #define GSM_MANAGER_SCHEMA        "org.gnome.SessionManager"
+ #define KEY_AUTOSAVE_ONE_SHOT     "auto-save-session-one-shot"
+ 
+ 
+ static gboolean gsm_session_clear_saved_session (const char *directory,
+                                                  GHashTable *discard_hash);
+ 
+ typedef struct {
+         char        *dir;
+         GHashTable  *discard_hash;
+         GError     **error;
+ } SessionSaveData;
+ 
++static void
++clear_session_type (const char *save_dir)
++{
++        char *file;
++
++        file = g_build_filename (save_dir, "type", NULL);
++
++        g_unlink (file);
++
++        g_free (file);
++}
++
++static void
++set_session_type (const char *save_dir,
++                  const char *type)
++{
++        char *file;
++        GError *error;
++
++        file = g_build_filename (save_dir, "type", NULL);
++
++        error = NULL;
++        g_file_set_contents (file, type, strlen (type), &error);
++        if (error != NULL)
++                g_warning ("couldn't save session type to %s: %s",
++                           type, error->message);
++
++        g_free (file);
++}
++
+ static gboolean
+ save_one_client (char            *id,
+                  GObject         *object,
+                  SessionSaveData *data)
+ {
+         GsmClient  *client;
+         GKeyFile   *keyfile;
+         const char *app_id;
+         char       *path = NULL;
+         char       *filename = NULL;
+         char       *contents = NULL;
+         gsize       length = 0;
+         char       *discard_exec;
+         GError     *local_error;
+ 
+         client = GSM_CLIENT (object);
+ 
+         local_error = NULL;
+ 
+         keyfile = gsm_client_save (client, &local_error);
+ 
+         if (keyfile == NULL || local_error) {
+                 goto out;
+         }
+ 
+         contents = g_key_file_to_data (keyfile, &length, &local_error);
+ 
+         if (local_error) {
+                 goto out;
+         }
+@@ -107,112 +139,114 @@ save_one_client (char            *id,
+                                               GSM_AUTOSTART_APP_DISCARD_KEY,
+                                               NULL);
+         if (discard_exec) {
+                 g_hash_table_insert (data->discard_hash,
+                                      discard_exec, discard_exec);
+         }
+ 
+         g_debug ("GsmSessionSave: saved client %s to %s", id, filename);
+ 
+ out:
+         if (keyfile != NULL) {
+                 g_key_file_free (keyfile);
+         }
+ 
+         g_free (contents);
+         g_free (filename);
+         g_free (path);
+ 
+         /* in case of any error, stop saving session */
+         if (local_error) {
+                 g_propagate_error (data->error, local_error);
+                 g_error_free (local_error);
+ 
+                 return TRUE;
+         }
+ 
+         return FALSE;
+ }
+ 
+ void
+-gsm_session_save (GsmStore  *client_store,
+-                  GError   **error)
++gsm_session_save (GsmStore    *client_store,
++                  const char  *type,
++                  GError     **error)
+ {
+         GSettings       *settings;
+         const char      *save_dir;
+         char            *tmp_dir;
+         SessionSaveData  data;
+ 
+         g_debug ("GsmSessionSave: Saving session");
+ 
+         /* Clear one shot key autosave in the event its set (so that it's actually
+          * one shot only)
+          */
+         settings = g_settings_new (GSM_MANAGER_SCHEMA);
+         g_settings_set_boolean (settings, KEY_AUTOSAVE_ONE_SHOT, FALSE);
+         g_object_unref (settings);
+ 
+         save_dir = gsm_util_get_saved_session_dir ();
+         if (save_dir == NULL) {
+                 g_warning ("GsmSessionSave: cannot create saved session directory");
+                 return;
+         }
+ 
+         tmp_dir = gsm_util_get_empty_tmp_session_dir ();
+         if (tmp_dir == NULL) {
+                 g_warning ("GsmSessionSave: cannot create new saved session directory");
+                 return;
+         }
+ 
+         /* save the session in a temp directory, and remember the discard
+          * commands */
+         data.dir = tmp_dir;
+         data.discard_hash = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                                    g_free, NULL);
+         data.error = error;
+ 
+         gsm_store_foreach (client_store,
+                            (GsmStoreFunc) save_one_client,
+                            &data);
+ 
+         if (!*error) {
+                 char *session_dir;
+ 
+                 if (g_file_test (save_dir, G_FILE_TEST_IS_SYMLINK))
+                         session_dir = g_file_read_link (save_dir, error);
+                 else
+                         session_dir = g_strdup (save_dir);
+ 
+                 if (session_dir != NULL) {
+-
+                         char *absolute_session_dir;
+ 
++                        set_session_type (tmp_dir, type);
++
+                         if (g_path_is_absolute (session_dir)) {
+                                 absolute_session_dir = g_strdup (session_dir);
+                         } else {
+                                 char *parent_dir;
+ 
+                                 parent_dir = g_path_get_dirname (save_dir);
+                                 absolute_session_dir = g_build_filename (parent_dir, session_dir, NULL);
+                                 g_free (parent_dir);
+                         }
+                         g_free (session_dir);
+ 
+                         /* remove the old saved session */
+                         gsm_session_clear_saved_session (absolute_session_dir, data.discard_hash);
+ 
+                         if (g_file_test (absolute_session_dir, G_FILE_TEST_IS_DIR))
+                                 g_rmdir (absolute_session_dir);
+                         g_rename (tmp_dir, absolute_session_dir);
+ 
+                         g_free (absolute_session_dir);
+                 }
+         } else {
+                 g_warning ("GsmSessionSave: error saving session: %s", (*error)->message);
+                 /* FIXME: we should create a hash table filled with the discard
+                  * commands that are in desktop files from save_dir. */
+                 gsm_session_clear_saved_session (tmp_dir, NULL);
+                 g_rmdir (tmp_dir);
+         }
+ 
+         g_hash_table_destroy (data.discard_hash);
+         g_free (tmp_dir);
+@@ -294,31 +328,32 @@ gsm_session_clear_saved_session (const char *directory,
+ 
+         while ((filename = g_dir_read_name (dir))) {
+                 char *path = g_build_filename (directory,
+                                                filename, NULL);
+ 
+                 result = gsm_session_clear_one_client (path, discard_hash)
+                          && result;
+ 
+                 g_free (path);
+         }
+ 
+         g_dir_close (dir);
+ 
+         return result;
+ }
+ 
+ void
+ gsm_session_save_clear (void)
+ {
+         const char *save_dir;
+ 
+         g_debug ("GsmSessionSave: Clearing saved session");
+ 
+         save_dir = gsm_util_get_saved_session_dir ();
+         if (save_dir == NULL) {
+                 g_warning ("GsmSessionSave: cannot create saved session directory");
+                 return;
+         }
+ 
+         gsm_session_clear_saved_session (save_dir, NULL);
++        clear_session_type (save_dir);
+ }
+diff --git a/gnome-session/gsm-session-save.h b/gnome-session/gsm-session-save.h
+index e623260f..c91b5615 100644
+--- a/gnome-session/gsm-session-save.h
++++ b/gnome-session/gsm-session-save.h
+@@ -1,33 +1,34 @@
+ /* gsm-session-save.h
+  * Copyright (C) 2008 Lucas Rocha.
+  *
+  * This program is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU General Public License as
+  * published by the Free Software Foundation; either version 2 of the
+  * License, or (at your option) any later version.
+  *
+  * This program is distributed in the hope that it will be useful, but
+  * WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+  * Lesser General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #ifndef __GSM_SESSION_SAVE_H__
+ #define __GSM_SESSION_SAVE_H__
+ 
+ #include <glib.h>
+ 
+ #include "gsm-store.h"
+ 
+ G_BEGIN_DECLS
+ 
+-void      gsm_session_save                 (GsmStore  *client_store,
+-                                            GError   **error);
++void      gsm_session_save                 (GsmStore    *client_store,
++                                            const char  *type,
++                                            GError     **error);
+ void      gsm_session_save_clear           (void);
+ 
+ G_END_DECLS
+ 
+ #endif /* __GSM_SESSION_SAVE_H__ */
+diff --git a/gnome-session/main.c b/gnome-session/main.c
+index 614c3427..7a4c855b 100644
+--- a/gnome-session/main.c
++++ b/gnome-session/main.c
+@@ -113,61 +113,70 @@ term_or_int_signal_cb (gpointer data)
+ 
+ static gboolean
+ sigusr2_cb (gpointer data)
+ {
+         g_debug ("-------- MARK --------");
+         return TRUE;
+ }
+ 
+ static gboolean
+ sigusr1_cb (gpointer data)
+ {
+         gdm_log_toggle_debug ();
+         return TRUE;
+ }
+ 
+ static void
+ create_manager (void)
+ {
+         GsmStore *client_store;
+ 
+         client_store = gsm_store_new ();
+         manager = gsm_manager_new (client_store, failsafe);
+         g_object_unref (client_store);
+ 
+         g_unix_signal_add (SIGTERM, term_or_int_signal_cb, manager);
+         g_unix_signal_add (SIGINT, term_or_int_signal_cb, manager);
+         g_unix_signal_add (SIGUSR1, sigusr1_cb, manager);
+         g_unix_signal_add (SIGUSR2, sigusr2_cb, manager);
+ 
+         if (IS_STRING_EMPTY (session_name)) {
+-                session_name = _gsm_manager_get_default_session (manager);
++                char *saved_session_name;
++
++                saved_session_name = _gsm_manager_get_saved_session (manager);
++
++                if (IS_STRING_EMPTY (saved_session_name))
++                        session_name = _gsm_manager_get_default_session (manager);
++                else
++                        session_name = g_steal_pointer (&saved_session_name);
++
++                g_free (saved_session_name);
+         }
+ 
+         if (!gsm_session_fill (manager, session_name)) {
+                 gsm_fail_whale_dialog_we_failed (FALSE, TRUE, NULL);
+         }
+ 
+         _gsm_manager_set_renderer (manager, gl_renderer);
+         gsm_manager_start (manager);
+ }
+ 
+ static void
+ on_bus_acquired (GDBusConnection *connection,
+                  const char *name,
+                  gpointer data)
+ {
+         create_manager ();
+ }
+ 
+ static guint
+ acquire_name (void)
+ {
+         return g_bus_own_name (G_BUS_TYPE_SESSION,
+                                GSM_DBUS_NAME,
+                                G_BUS_NAME_OWNER_FLAGS_NONE,
+                                on_bus_acquired,
+                                NULL,
+                                on_name_lost,
+                                NULL, NULL);
+ }
+ 
+-- 
+2.12.0
+

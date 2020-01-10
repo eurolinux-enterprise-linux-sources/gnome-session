@@ -1,0 +1,79 @@
+From 8df9a4f1bb272d982d7b63fb2f4c7db92ff55a10 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Wed, 8 Jan 2014 10:15:29 -0500
+Subject: [PATCH 17/19] session-selector: use classic mode by default
+
+---
+ tools/gnome-session-selector.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tools/gnome-session-selector.c b/tools/gnome-session-selector.c
+index f7f12e7b..1068dbba 100644
+--- a/tools/gnome-session-selector.c
++++ b/tools/gnome-session-selector.c
+@@ -16,61 +16,61 @@
+  * along with this program; if not, see <http://www.gnu.org/licenses/>.
+  *
+  * Written by: Matthias Clasen <mclasen@redhat.com>
+  */
+ 
+ #include "config.h"
+ 
+ #include <fcntl.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <unistd.h>
+ 
+ #include <glib.h>
+ #include <gtk/gtk.h>
+ #include <gio/gio.h>
+ 
+ #include <glib/gi18n.h>
+ #include <glib/gstdio.h>
+ 
+ #include <dbus/dbus-glib.h>
+ #include <dbus/dbus-glib-lowlevel.h>
+ 
+ #define GSM_SERVICE_DBUS   "org.gnome.SessionManager"
+ #define GSM_PATH_DBUS      "/org/gnome/SessionManager"
+ #define GSM_INTERFACE_DBUS "org.gnome.SessionManager"
+ 
+ #define GSM_MANAGER_SCHEMA        "org.gnome.SessionManager"
+ #define KEY_AUTOSAVE_ONE_SHOT     "auto-save-session-one-shot"
+-#define DEFAULT_SESSION_NAME      "gnome"
++#define DEFAULT_SESSION_NAME      "gnome-classic"
+ 
+ static GtkBuilder *builder;
+ static GtkWidget *session_list;
+ static GtkListStore *store;
+ static GtkTreeModelSort *sort_model;
+ static char *info_text;
+ 
+ static void select_session (const char *name);
+ static gboolean make_session_current (const char *name);
+ 
+ static char *
+ get_session_path (const char *name)
+ {
+         return g_build_filename (g_get_user_config_dir (), "gnome-session", name, NULL);
+ }
+ 
+ static char *
+ find_new_session_name (void)
+ {
+         char *name;
+         char *path;
+         int i;
+ 
+         for (i = 1; i < 20; i++) {
+                 name = g_strdup_printf (_("Session %d"), i);
+                 path = get_session_path (name);
+                 if (!g_file_test (path, G_FILE_TEST_EXISTS)) {
+                         g_free (path);
+                         return name;
+                 }
+-- 
+2.12.0
+

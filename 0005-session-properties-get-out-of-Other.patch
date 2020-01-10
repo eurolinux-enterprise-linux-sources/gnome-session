@@ -1,0 +1,34 @@
+From d53180ebccd678fae1da76d1defb05a9c73e92fe Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Fri, 20 Dec 2013 15:07:35 -0500
+Subject: [PATCH 05/19] session-properties: get out of Other
+
+Put it in the menus next to Settings and Software
+---
+ data/session-properties.desktop.in.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/data/session-properties.desktop.in.in b/data/session-properties.desktop.in.in
+index 3dc7b033..dcfe2f84 100644
+--- a/data/session-properties.desktop.in.in
++++ b/data/session-properties.desktop.in.in
+@@ -1,15 +1,15 @@
+ [Desktop Entry]
+ _Name=Startup Applications
+ _Comment=Choose what applications to start when you log in
+ Exec=gnome-session-properties
+ Icon=session-properties
+ Terminal=false
+ Type=Application
+ StartupNotify=true
+-Categories=GTK;GNOME;Settings;X-GNOME-PersonalSettings;
++Categories=GNOME;GTK;System;
+ OnlyShowIn=GNOME;Unity;
+ NoDisplay=true
+ X-GNOME-Bugzilla-Bugzilla=GNOME
+ X-GNOME-Bugzilla-Product=gnome-session
+ X-GNOME-Bugzilla-Component=gnome-session-properties
+ X-GNOME-Bugzilla-Version=@VERSION@
+-- 
+2.12.0
+

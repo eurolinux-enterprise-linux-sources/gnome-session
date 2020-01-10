@@ -1,0 +1,2851 @@
+From 5d77ba7a2ce0bedfc65a991bd232e518418ce950 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Wed, 8 Mar 2017 14:08:09 -0500
+Subject: [PATCH 01/19] Revert "Remove all references to
+ gnome-session-properties"
+
+This reverts commit 0c6fe6ca14b65cdfc1cd039a5cc9cb83ea346d6b.
+---
+ configure.ac                                       |   8 +
+ data/Makefile.am                                   |   5 +-
+ data/icons/16x16/Makefile.am                       |  28 ++
+ data/icons/16x16/session-properties.png            | Bin 0 -> 595 bytes
+ data/icons/16x16/session-properties.svg            | 394 ++++++++++++++++
+ data/icons/22x22/Makefile.am                       |  27 ++
+ data/icons/22x22/session-properties.png            | Bin 0 -> 754 bytes
+ data/icons/22x22/session-properties.svg            | 440 ++++++++++++++++++
+ data/icons/24x24/Makefile.am                       |  25 +
+ data/icons/24x24/session-properties.png            | Bin 0 -> 784 bytes
+ data/icons/32x32/Makefile.am                       |  27 ++
+ data/icons/32x32/session-properties.png            | Bin 0 -> 1109 bytes
+ data/icons/32x32/session-properties.svg            | 490 ++++++++++++++++++++
+ data/icons/48x48/Makefile.am                       |  25 +
+ data/icons/48x48/session-properties.png            | Bin 0 -> 1839 bytes
+ data/icons/Makefile.am                             |   3 +
+ data/icons/scalable/Makefile.am                    |  25 +
+ data/icons/scalable/session-properties.svg         | 515 +++++++++++++++++++++
+ data/icons/symbolic/Makefile.am                    |  25 +
+ .../icons/symbolic/session-properties-symbolic.svg |  28 ++
+ data/session-properties.ui                         | 323 +++++++++++++
+ doc/man/gnome-session.1                            |   2 +
+ po/POTFILES.in                                     |   1 +
+ 23 files changed, 2390 insertions(+), 1 deletion(-)
+ create mode 100644 data/icons/16x16/Makefile.am
+ create mode 100644 data/icons/16x16/session-properties.png
+ create mode 100644 data/icons/16x16/session-properties.svg
+ create mode 100644 data/icons/22x22/Makefile.am
+ create mode 100644 data/icons/22x22/session-properties.png
+ create mode 100644 data/icons/22x22/session-properties.svg
+ create mode 100644 data/icons/24x24/Makefile.am
+ create mode 100644 data/icons/24x24/session-properties.png
+ create mode 100644 data/icons/32x32/Makefile.am
+ create mode 100644 data/icons/32x32/session-properties.png
+ create mode 100644 data/icons/32x32/session-properties.svg
+ create mode 100644 data/icons/48x48/Makefile.am
+ create mode 100644 data/icons/48x48/session-properties.png
+ create mode 100644 data/icons/Makefile.am
+ create mode 100644 data/icons/scalable/Makefile.am
+ create mode 100644 data/icons/scalable/session-properties.svg
+ create mode 100644 data/icons/symbolic/Makefile.am
+ create mode 100644 data/icons/symbolic/session-properties-symbolic.svg
+ create mode 100644 data/session-properties.ui
+
+diff --git a/configure.ac b/configure.ac
+index c6facb35..776c8208 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -343,60 +343,68 @@ if test $enable_ipv6 = yes; then
+   dnl =================================================================
+   dnl Now we would check for specific function like getaddrinfo.
+   dnl =================================================================
+   have_getaddrinfo=no
+   if test $have_ipv6=yes; then
+     AC_CHECK_FUNC(getaddrinfo, have_getaddrinfo=yes)
+     if test $have_getaddrinfo != yes; then
+       # getaddrinfo is not in the default libraries.  See if it's in some other.
+       for lib in bsd socket inet; do
+         AC_CHECK_LIB($lib, getaddrinfo, [LIBS="$LIBS -l$lib";have_getaddrinfo=yes; break])
+       done
+     fi
+     if test $have_getaddrinfo=yes; then
+       AC_DEFINE(ENABLE_IPV6, 1, [Define if IPV6 is supported])
+       have_full_ipv6=yes
+     fi
+   fi
+ fi
+ dnl ==============================================================================
+ dnl End of IPv6 checks
+ dnl ==============================================================================
+ 
+ AC_CONFIG_FILES([
+ Makefile
+ doc/Makefile
+ doc/dbus/Makefile
+ doc/dbus/gnome-session.xml
+ doc/man/Makefile
+ data/Makefile
+ data/org.gnome.SessionManager.gschema.xml
++data/icons/Makefile
++data/icons/16x16/Makefile
++data/icons/22x22/Makefile
++data/icons/24x24/Makefile
++data/icons/32x32/Makefile
++data/icons/48x48/Makefile
++data/icons/scalable/Makefile
++data/icons/symbolic/Makefile
+ gnome-session/Makefile
+ tools/Makefile
+ po/Makefile.in
+ ])
+ AC_OUTPUT
+ 
+ dnl ---------------------------------------------------------------------------
+ dnl - Show summary
+ dnl ---------------------------------------------------------------------------
+ 
+ echo "
+               gnome-session $VERSION
+               `echo gnome-session $VERSION | sed "s/./=/g"`
+ 
+         prefix:                   ${prefix}
+         exec_prefix:              ${exec_prefix}
+         libdir:                   ${libdir}
+         bindir:                   ${bindir}
+         sbindir:                  ${sbindir}
+         sysconfdir:               ${sysconfdir}
+         localstatedir:            ${localstatedir}
+         datadir:                  ${datadir}
+         source code location:     ${srcdir}
+         compiler:                 ${CC}
+         cflags:                   ${CFLAGS}
+         Maintainer mode:          ${USE_MAINTAINER_MODE}
+         Use *_DISABLE_DEPRECATED: ${enable_deprecation_flags}
+ 
+         GConf support:            ${enable_gconf}
+         Session tracking:         ${session_tracking}
+diff --git a/data/Makefile.am b/data/Makefile.am
+index ae08730d..a171dfcb 100644
+--- a/data/Makefile.am
++++ b/data/Makefile.am
+@@ -1,32 +1,35 @@
++SUBDIRS = icons
++
+ uidir = $(pkgdatadir)
+-ui_DATA =
++ui_DATA = \
++	session-properties.ui
+ 
+ if BUILD_SESSION_SELECTOR
+ ui_DATA += session-selector.ui
+ endif
+ 
+ hwcompatdir = $(pkgdatadir)
+ hwcompat_DATA = hardware-compatibility
+ 
+ xsessiondir = $(datadir)/xsessions
+ xsession_in_files = gnome.desktop.in gnome-xorg.desktop.in
+ 
+ if BUILD_SESSION_SELECTOR
+ xsession_in_files += gnome-custom-session.desktop.in
+ endif
+ 
+ xsession_DATA = $(xsession_in_files:.desktop.in=.desktop)
+ 
+ wayland_sessiondir = $(datadir)/wayland-sessions
+ wayland_session_in_files = gnome.desktop.in
+ wayland_session_DATA = $(wayland_session_in_files:.desktop.in=.desktop)
+ 
+ sessiondir = $(datadir)/gnome-session/sessions
+ session_in_in_files = gnome.session.desktop.in.in gnome-dummy.session.desktop.in.in
+ session_in_files = $(session_in_in_files:.session.desktop.in.in=.session.desktop.in)
+ session_DATA = $(session_in_files:.session.desktop.in=.session)
+ 
+ %.session.desktop.in: %.session.desktop.in.in Makefile
+ 	$(AM_V_GEN)sed \
+ 		-e "s|\@LIBEXECDIR\@|$(libexecdir)|" \
+ 		$< > $@
+diff --git a/data/icons/16x16/Makefile.am b/data/icons/16x16/Makefile.am
+new file mode 100644
+index 00000000..d338f4c3
+--- /dev/null
++++ b/data/icons/16x16/Makefile.am
+@@ -0,0 +1,28 @@
++size = 16x16
++
++themedir = $(datadir)/icons/hicolor
++iconsdir = $(themedir)/$(size)/apps
++
++icons_DATA = session-properties.png
++icons_SOURCE = session-properties.svg
++
++gtk_update_icon_cache = gtk-update-icon-cache -f -t $(datadir)/icons/hicolor
++
++install-data-hook:
++	@-if test -z "$(DESTDIR)"; then \
++		echo "Updating Gtk icon cache."; \
++		$(gtk_update_icon_cache); \
++	else \
++		echo "*** Icon cache not updated. After install, run this:"; \
++		echo "***   $(gtk_update_icon_cache)"; \
++	fi
++
++uninstall-hook:
++	@rm -f  $(DESTDIR)$(themedir)/icon-theme.cache
++
++
++EXTRA_DIST =		\
++	$(icons_DATA)	\
++	$(icons_SOURCE)
++
++-include $(top_srcdir)/git.mk
+diff --git a/data/icons/16x16/session-properties.png b/data/icons/16x16/session-properties.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..1367c20ae73a8b5e73d98f5dbcb6341cd0dc9ebe
+GIT binary patch
+literal 595
+zcmV-Z0<8UsP)<h;3K|Lk000e1NJLTq000mG000mO1^@s6AM^iV00006VoOIv0RI60
+z0RN!9r;`8x00(qQO+^RS0T2);6YR^V(*OVg^+`lQR5*>5liy2|Q5eTR&-=cox8c~2
+zT2`*8E+SB&p~E)2@g|62&LHY4vde`2fUqAIbrnQ(5fMsI5DdE5O+<8)3nGl7Xd(&*
+zq1IM`>7Zrq{n5poPS>=at8;js&-a|~^PD4B?+lHE1HU`?hY%420RcqF7tApudZ4MJ
+zE8c~s=~abwC6-r?>+t&Bt7c<7Zxa4AL0x8@n8=B3Jba!bXKlr@-Brn-Gw*5G6{!mw
+zx-k6mv!wxSGPJ6c%lz0AW=9{ddwPY@08FFo-*qhJvS~b}{D#-BFh)hqDJ?Mn;Sqax
+z1UY%4pUYP+GX3;gE$H#$@o&f6A6pS{7YqD&bD!wJR(gAqhzK`t+(Oedlu{Umfl>;k
+z6vbkZ$&Zr^-W$Se?b9@IZQiD@6K)K0JlTuXpCJG~pO5yocFvyeBealJnkzc7<awsQ
+z<jK6qZ0Nlbp->1Mt88Ig(;l`&`*@Z~@%7txx)TWoE?xL5*x>ck8IN-~-nr5P)6mg9
+zK7!FRjAql!4BiEV-A4y%1ngf0M#hJkno0pnV_cr8VG@X(V$SseZVe2edwlqtk5MQt
+z;yTunfU0^(A_Q7`2)1_DZ-59bhmMpjh+r#S^hDdv)kSOfYppnq%x;cY66;Uhwo3Ln
+haR2i^x#&uN@CTAjj`{aKg8l#i002ovPDHLkV1gZB6^{S_
+
+literal 0
+HcmV?d00001
+
+diff --git a/data/icons/16x16/session-properties.svg b/data/icons/16x16/session-properties.svg
+new file mode 100644
+index 00000000..4f7c37f2
+--- /dev/null
++++ b/data/icons/16x16/session-properties.svg
+@@ -0,0 +1,394 @@
++<?xml version="1.0" encoding="UTF-8" standalone="no"?>
++<!-- Created with Inkscape (http://www.inkscape.org/) -->
++<svg
++   xmlns:dc="http://purl.org/dc/elements/1.1/"
++   xmlns:cc="http://web.resource.org/cc/"
++   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
++   xmlns:svg="http://www.w3.org/2000/svg"
++   xmlns="http://www.w3.org/2000/svg"
++   xmlns:xlink="http://www.w3.org/1999/xlink"
++   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
++   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
++   width="16"
++   height="16"
++   id="svg7854"
++   sodipodi:version="0.32"
++   inkscape:version="0.44+devel"
++   version="1.0"
++   sodipodi:docname="session-properties.svg"
++   sodipodi:docbase="/home/jimmac/gfx/ximian/art/icons/control-center/22x22"
++   inkscape:output_extension="org.inkscape.output.svg.inkscape"
++   sodipodi:modified="true">
++  <defs
++     id="defs7856">
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5650">
++      <stop
++         style="stop-color:#d3d7cf;stop-opacity:1;"
++         offset="0"
++         id="stop5652" />
++      <stop
++         style="stop-color:#9ea795;stop-opacity:1"
++         offset="1"
++         id="stop5654" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5642">
++      <stop
++         style="stop-color:#eeeeec;stop-opacity:1;"
++         offset="0"
++         id="stop5644" />
++      <stop
++         style="stop-color:#c3c3bc;stop-opacity:1"
++         offset="1"
++         id="stop5646" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5634">
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1;"
++         offset="0"
++         id="stop5636" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:0;"
++         offset="1"
++         id="stop5638" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5598">
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1;"
++         offset="0"
++         id="stop5600" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:0;"
++         offset="1"
++         id="stop5602" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5716">
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1;"
++         offset="0"
++         id="stop5718" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:0;"
++         offset="1"
++         id="stop5720" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5700">
++      <stop
++         style="stop-color:#e4e4e4;stop-opacity:1;"
++         offset="0"
++         id="stop5702" />
++      <stop
++         id="stop5708"
++         offset="0.639386"
++         style="stop-color:#fefefe;stop-opacity:1" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1"
++         offset="0.79632628"
++         id="stop5710" />
++      <stop
++         style="stop-color:#949494;stop-opacity:1"
++         offset="1"
++         id="stop5704" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient3832">
++      <stop
++         id="stop3834"
++         offset="0.0000000"
++         style="stop-color:#ffffff;stop-opacity:1.0000000" />
++      <stop
++         id="stop3836"
++         offset="1.0000000"
++         style="stop-color:#e0e0e0;stop-opacity:1.0000000" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient4816">
++      <stop
++         id="stop4818"
++         offset="0.0000000"
++         style="stop-color:#204a87;stop-opacity:1.0000000" />
++      <stop
++         id="stop4820"
++         offset="1.0000000"
++         style="stop-color:#204a87;stop-opacity:0.0000000" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient5048">
++      <stop
++         id="stop5050"
++         offset="0"
++         style="stop-color:black;stop-opacity:0;" />
++      <stop
++         style="stop-color:black;stop-opacity:1;"
++         offset="0.5"
++         id="stop5056" />
++      <stop
++         id="stop5052"
++         offset="1"
++         style="stop-color:black;stop-opacity:0;" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient5060"
++       inkscape:collect="always">
++      <stop
++         id="stop5062"
++         offset="0"
++         style="stop-color:black;stop-opacity:1;" />
++      <stop
++         id="stop5064"
++         offset="1"
++         style="stop-color:black;stop-opacity:0;" />
++    </linearGradient>
++    <radialGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5060"
++       id="radialGradient5664"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(-6.6526975e-2,0,0,3.5014969e-2,47.812816,25.161837)"
++       cx="605.71429"
++       cy="486.64789"
++       fx="605.71429"
++       fy="486.64789"
++       r="117.14286" />
++    <radialGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5060"
++       id="radialGradient5667"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(6.6526975e-2,0,0,3.5014969e-2,-0.2505064,25.161837)"
++       cx="605.71429"
++       cy="486.64789"
++       fx="605.71429"
++       fy="486.64789"
++       r="117.14286" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5048"
++       id="linearGradient5670"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(6.6526975e-2,0,0,3.5014969e-2,-0.2635996,25.161837)"
++       x1="302.85715"
++       y1="366.64789"
++       x2="302.85715"
++       y2="609.50507" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient3832"
++       id="linearGradient5682"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(1.451927,0,0,1.3372801,-45.830775,7.6961475)"
++       x1="17.88068"
++       y1="11.072588"
++       x2="17.88068"
++       y2="21.767578" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient4816"
++       id="linearGradient5684"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(1.4668451,0,0,1.8750592,-45.628571,3.9919211)"
++       x1="13.050564"
++       y1="11.353518"
++       x2="13.050564"
++       y2="5.6173568" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5700"
++       id="linearGradient5728"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="translate(0.5,0)"
++       x1="24"
++       y1="23"
++       x2="45.505005"
++       y2="23" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5716"
++       id="linearGradient5730"
++       gradientUnits="userSpaceOnUse"
++       x1="40.745819"
++       y1="23"
++       x2="44.005268"
++       y2="23" />
++    <filter
++       inkscape:collect="always"
++       id="filter5786">
++      <feGaussianBlur
++         inkscape:collect="always"
++         stdDeviation="0.62861987"
++         id="feGaussianBlur5788" />
++    </filter>
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5598"
++       id="linearGradient5604"
++       x1="25.627417"
++       y1="8"
++       x2="25.627417"
++       y2="4.7617435"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(0.3170731,0,0,0.1513709,0.3902442,0.3687103)" />
++    <filter
++       inkscape:collect="always"
++       x="-0.019480519"
++       width="1.0389611"
++       y="-0.14285713"
++       height="1.2857143"
++       id="filter5628">
++      <feGaussianBlur
++         inkscape:collect="always"
++         stdDeviation="0.42857143"
++         id="feGaussianBlur5630" />
++    </filter>
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5634"
++       id="linearGradient5640"
++       x1="25.313259"
++       y1="42.656792"
++       x2="25.313261"
++       y2="10.129107"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(0.3182502,0,0,0.3589572,0.3378627,-0.7556826)" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5642"
++       id="linearGradient5648"
++       x1="26.29347"
++       y1="7.3125"
++       x2="26.232994"
++       y2="3.5357027"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(0.3500965,0,0,0.4000001,-0.3752413,-0.8999998)" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5650"
++       id="linearGradient5656"
++       x1="26.29347"
++       y1="7.3125"
++       x2="26.232994"
++       y2="3.5357027"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(0.3500965,0,0,0.4000001,-0.3752413,-0.8999998)" />
++  </defs>
++  <sodipodi:namedview
++     id="base"
++     pagecolor="#ffffff"
++     bordercolor="#e0e0e0"
++     borderopacity="1"
++     gridtolerance="10000"
++     guidetolerance="10"
++     objecttolerance="10"
++     inkscape:pageopacity="0.0"
++     inkscape:pageshadow="2"
++     inkscape:zoom="1"
++     inkscape:cx="13.920386"
++     inkscape:cy="2.77771"
++     inkscape:document-units="px"
++     inkscape:current-layer="layer1"
++     width="16px"
++     height="16px"
++     inkscape:showpageshadow="false"
++     inkscape:window-width="1102"
++     inkscape:window-height="958"
++     inkscape:window-x="2117"
++     inkscape:window-y="82"
++     showgrid="false"
++     borderlayer="true" />
++  <metadata
++     id="metadata7859">
++    <rdf:RDF>
++      <cc:Work
++         rdf:about="">
++        <dc:format>image/svg+xml</dc:format>
++        <dc:type
++           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
++        <dc:creator>
++          <cc:Agent>
++            <dc:title>Jakub Steiner</dc:title>
++          </cc:Agent>
++        </dc:creator>
++        <dc:source>http://jimmac.musichall.cz</dc:source>
++        <cc:license
++           rdf:resource="http://creativecommons.org/licenses/GPL/2.0/" />
++        <dc:title>Gnome Session Properties</dc:title>
++      </cc:Work>
++      <cc:License
++         rdf:about="http://creativecommons.org/licenses/GPL/2.0/">
++        <cc:permits
++           rdf:resource="http://web.resource.org/cc/Reproduction" />
++        <cc:permits
++           rdf:resource="http://web.resource.org/cc/Distribution" />
++        <cc:requires
++           rdf:resource="http://web.resource.org/cc/Notice" />
++        <cc:permits
++           rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
++        <cc:requires
++           rdf:resource="http://web.resource.org/cc/ShareAlike" />
++        <cc:requires
++           rdf:resource="http://web.resource.org/cc/SourceCode" />
++      </cc:License>
++    </rdf:RDF>
++  </metadata>
++  <g
++     inkscape:label="Layer 1"
++     inkscape:groupmode="layer"
++     id="layer1">
++    <rect
++       style="opacity:1;color:#000000;fill:#729fcf;fill-opacity:1;fill-rule:evenodd;stroke:#3465a4;stroke-width:1.00000012;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
++       id="rect4585"
++       width="15.054147"
++       height="14.931664"
++       x="0.50000006"
++       y="0.56833637"
++       rx="0.80243546"
++       ry="0.85151595" />
++    <rect
++       style="opacity:1;color:#000000;fill:url(#linearGradient5648);fill-opacity:1;fill-rule:evenodd;stroke:url(#linearGradient5656);stroke-width:1.00000012;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
++       id="rect5556"
++       width="15.054147"
++       height="1.9999999"
++       x="0.5"
++       y="0.50000006"
++       rx="0.80249435"
++       ry="0.91688365" />
++    <rect
++       ry="0"
++       rx="0"
++       y="0.90594715"
++       x="1.5"
++       height="13.594053"
++       width="12.999999"
++       id="rect5632"
++       style="opacity:0.52571429;color:#000000;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:url(#linearGradient5640);stroke-width:1.00000012;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate" />
++    <g
++       id="g5724"
++       transform="matrix(0.4041599,0,0,0.4075968,-2.9205921,-0.7107676)">
++      <path
++         sodipodi:nodetypes="cccccccccc"
++         id="path5698"
++         d="M 11.121851,22.804198 L 23.199467,12.216748 L 23.199467,17.747078 L 36.633956,17.747078 C 44.741684,17.747078 45.5,23.213443 45.5,23.213443 L 45.5,36.603439 C 45.5,36.603439 43.628297,27.513864 36.758956,27.513864 L 23.199467,27.513864 L 23.199467,33 L 11.121851,22.804198 z "
++         style="fill:url(#linearGradient5728);fill-opacity:1;fill-rule:evenodd;stroke:#555753;stroke-width:2.46381474px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
++    </g>
++    <rect
++       ry="0.17072184"
++       rx="0.35760722"
++       y="1.0498793"
++       x="1.5"
++       height="0.45411268"
++       width="13"
++       id="rect4627"
++       style="opacity:1;color:#000000;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:url(#linearGradient5604);stroke-width:0.99999982;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate" />
++  </g>
++</svg>
+diff --git a/data/icons/22x22/Makefile.am b/data/icons/22x22/Makefile.am
+new file mode 100644
+index 00000000..ae4931c2
+--- /dev/null
++++ b/data/icons/22x22/Makefile.am
+@@ -0,0 +1,27 @@
++size = 22x22
++
++themedir = $(datadir)/icons/hicolor
++iconsdir = $(themedir)/$(size)/apps
++
++icons_DATA = session-properties.png
++icons_SOURCE = session-properties.svg
++
++gtk_update_icon_cache = gtk-update-icon-cache -f -t $(datadir)/icons/hicolor
++
++install-data-hook:
++	@-if test -z "$(DESTDIR)"; then \
++		echo "Updating Gtk icon cache."; \
++		$(gtk_update_icon_cache); \
++	else \
++		echo "*** Icon cache not updated. After install, run this:"; \
++		echo "***   $(gtk_update_icon_cache)"; \
++	fi
++
++uninstall-hook:
++	@rm -f  $(DESTDIR)$(themedir)/icon-theme.cache
++
++EXTRA_DIST =		\
++	$(icons_DATA)	\
++	$(icons_SOURCE)
++
++-include $(top_srcdir)/git.mk
+diff --git a/data/icons/22x22/session-properties.png b/data/icons/22x22/session-properties.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..12225ee3c2abb7f1a4be7bb77743514cde5d08fe
+GIT binary patch
+literal 754
+zcmV<O0uB9%P)<h;3K|Lk000e1NJLTq000&M000&U1^@s6#I$TX00006VoOIv0RI60
+z0RN!9r;`8x00(qQO+^RS0T2)kIanL5EdT%llu1NER5*>*lgmp~Q5?rV=iJ8}9cNN|
+z*^7v%7U@C>t-#cZ78aG(u1!U>>3?Wdi-=qVy&!035MdZp6cK`;6=)9%L}*o1+QXS<
+zrhDh!x%ag2IgaI2wCD>54nNNCbAIQ0en0p}5&)+zUwyJH?$rySe=k`GKp@08Dn#(^
+zvwipEi6gtkmW~@G9owqD*VWWd-ZLw?sM;o^8GQX*Z?0{SrZ<G$yTr?>k|A?`$gdTK
+zaDO0~126$@_KpOjxkYBE3$4&W4q=!@f;D|lKLr4CGH98F<?6s^<ngtlE4Iuj+%(vp
+z5d_dVkHoX<_^FYi!S-BW%a{&^zDr`Tlct8+qM_rA=~qvgH~EavcSsC$(za(8JGbwk
+zzrUAc-}!l=0TQ=zHBzq<d0^X=gkGAlf$JRH+e&j&6RzuW_RP77eg!EdLI|Xkc}oa^
+z<2YQnbdk3oUz&MV*rw#mi(4qeXM0NvuIu7B4(W87R4PR(l_HbL;JPl^Y!=`534(wy
+z4AEMnlwxyz11dKv3p}o<*+<F==)T>JQi}5Oa^mqgu~>{)EJidMMJYuj62Y=848xeJ
+z7{D+L1iH`)Q^hH(Zs*Q}TLfW9+rIrAJ$4v9M}N;&M3t~^?Yf_TUfIGGi0XFkJ?vs^
+zYz(b6)`qru!Jd<3_)R}Lm(2&;GX^ADxg2T^@_4WdfT}ec=LG{SSQ+D0UpJ69dHDkp
+zt*9bia{#F-ih=@c+|<a2XtM_(zYO=3ptZ0KS#Yqld@0Ktj~5MA5u2=8sR7GO3_Vgy
+z)^C+wE}*q;S<#TWl+1VtbO<ak6Ca1Zdg)J{r?2)L(g@>kzyj@OzrDW#WF~*C6j%({
+kfc1x54{(9eiT!`39~bB4p9yeF3;+NC07*qoM6N<$f(k-YiU0rr
+
+literal 0
+HcmV?d00001
+
+diff --git a/data/icons/22x22/session-properties.svg b/data/icons/22x22/session-properties.svg
+new file mode 100644
+index 00000000..1d0afda2
+--- /dev/null
++++ b/data/icons/22x22/session-properties.svg
+@@ -0,0 +1,440 @@
++<?xml version="1.0" encoding="UTF-8" standalone="no"?>
++<!-- Created with Inkscape (http://www.inkscape.org/) -->
++<svg
++   xmlns:dc="http://purl.org/dc/elements/1.1/"
++   xmlns:cc="http://web.resource.org/cc/"
++   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
++   xmlns:svg="http://www.w3.org/2000/svg"
++   xmlns="http://www.w3.org/2000/svg"
++   xmlns:xlink="http://www.w3.org/1999/xlink"
++   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
++   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
++   width="22"
++   height="22"
++   id="svg7854"
++   sodipodi:version="0.32"
++   inkscape:version="0.44+devel"
++   version="1.0"
++   sodipodi:docname="session-properties.svg"
++   sodipodi:docbase="/home/jimmac/gfx/ximian/art/icons/control-center/32x32"
++   inkscape:output_extension="org.inkscape.output.svg.inkscape"
++   sodipodi:modified="true">
++  <defs
++     id="defs7856">
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5650">
++      <stop
++         style="stop-color:#d3d7cf;stop-opacity:1;"
++         offset="0"
++         id="stop5652" />
++      <stop
++         style="stop-color:#9ea795;stop-opacity:1"
++         offset="1"
++         id="stop5654" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5642">
++      <stop
++         style="stop-color:#eeeeec;stop-opacity:1;"
++         offset="0"
++         id="stop5644" />
++      <stop
++         style="stop-color:#c3c3bc;stop-opacity:1"
++         offset="1"
++         id="stop5646" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5634">
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1;"
++         offset="0"
++         id="stop5636" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:0;"
++         offset="1"
++         id="stop5638" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5598">
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1;"
++         offset="0"
++         id="stop5600" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:0;"
++         offset="1"
++         id="stop5602" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5716">
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1;"
++         offset="0"
++         id="stop5718" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:0;"
++         offset="1"
++         id="stop5720" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5700">
++      <stop
++         style="stop-color:#e4e4e4;stop-opacity:1;"
++         offset="0"
++         id="stop5702" />
++      <stop
++         id="stop5708"
++         offset="0.639386"
++         style="stop-color:#fefefe;stop-opacity:1" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1"
++         offset="0.79632628"
++         id="stop5710" />
++      <stop
++         style="stop-color:#949494;stop-opacity:1"
++         offset="1"
++         id="stop5704" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient3832">
++      <stop
++         id="stop3834"
++         offset="0.0000000"
++         style="stop-color:#ffffff;stop-opacity:1.0000000" />
++      <stop
++         id="stop3836"
++         offset="1.0000000"
++         style="stop-color:#e0e0e0;stop-opacity:1.0000000" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient4816">
++      <stop
++         id="stop4818"
++         offset="0.0000000"
++         style="stop-color:#204a87;stop-opacity:1.0000000" />
++      <stop
++         id="stop4820"
++         offset="1.0000000"
++         style="stop-color:#204a87;stop-opacity:0.0000000" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient5048">
++      <stop
++         id="stop5050"
++         offset="0"
++         style="stop-color:black;stop-opacity:0;" />
++      <stop
++         style="stop-color:black;stop-opacity:1;"
++         offset="0.5"
++         id="stop5056" />
++      <stop
++         id="stop5052"
++         offset="1"
++         style="stop-color:black;stop-opacity:0;" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient5060"
++       inkscape:collect="always">
++      <stop
++         id="stop5062"
++         offset="0"
++         style="stop-color:black;stop-opacity:1;" />
++      <stop
++         id="stop5064"
++         offset="1"
++         style="stop-color:black;stop-opacity:0;" />
++    </linearGradient>
++    <radialGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5060"
++       id="radialGradient5664"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(-6.6526975e-2,0,0,3.5014969e-2,47.812816,25.161837)"
++       cx="605.71429"
++       cy="486.64789"
++       fx="605.71429"
++       fy="486.64789"
++       r="117.14286" />
++    <radialGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5060"
++       id="radialGradient5667"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(6.6526975e-2,0,0,3.5014969e-2,-0.2505064,25.161837)"
++       cx="605.71429"
++       cy="486.64789"
++       fx="605.71429"
++       fy="486.64789"
++       r="117.14286" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5048"
++       id="linearGradient5670"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(6.6526975e-2,0,0,3.5014969e-2,-0.2635996,25.161837)"
++       x1="302.85715"
++       y1="366.64789"
++       x2="302.85715"
++       y2="609.50507" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient3832"
++       id="linearGradient5682"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(1.451927,0,0,1.3372801,-45.830775,7.6961475)"
++       x1="17.88068"
++       y1="11.072588"
++       x2="17.88068"
++       y2="21.767578" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient4816"
++       id="linearGradient5684"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(1.4668451,0,0,1.8750592,-45.628571,3.9919211)"
++       x1="13.050564"
++       y1="11.353518"
++       x2="13.050564"
++       y2="5.6173568" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5700"
++       id="linearGradient5728"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="translate(0.5,0)"
++       x1="24"
++       y1="23"
++       x2="45.505005"
++       y2="23" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5716"
++       id="linearGradient5730"
++       gradientUnits="userSpaceOnUse"
++       x1="40.745819"
++       y1="23"
++       x2="44.005268"
++       y2="23" />
++    <filter
++       inkscape:collect="always"
++       id="filter5786">
++      <feGaussianBlur
++         inkscape:collect="always"
++         stdDeviation="0.62861987"
++         id="feGaussianBlur5788" />
++    </filter>
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5598"
++       id="linearGradient5604"
++       x1="25.627417"
++       y1="8"
++       x2="25.627417"
++       y2="4.7617435"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(0.4311139,0,0,0.1911915,0.6155053,1.0660639)" />
++    <filter
++       inkscape:collect="always"
++       x="-0.019480519"
++       width="1.0389611"
++       y="-0.14285713"
++       height="1.2857143"
++       id="filter5628">
++      <feGaussianBlur
++         inkscape:collect="always"
++         stdDeviation="0.42857143"
++         id="feGaussianBlur5630" />
++    </filter>
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5634"
++       id="linearGradient5640"
++       x1="25.313259"
++       y1="42.656792"
++       x2="25.313261"
++       y2="10.129107"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(0.4161734,0,0,0.4097743,0.9802818,8.45901e-2)" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5642"
++       id="linearGradient5648"
++       x1="26.29347"
++       y1="7.3125"
++       x2="26.232994"
++       y2="3.5357027"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(0.4415111,0,0,0.3917361,0.3659716,0.1289237)" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5650"
++       id="linearGradient5656"
++       x1="26.29347"
++       y1="7.3125"
++       x2="26.232994"
++       y2="3.5357027"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(0.4415111,0,0,0.3917361,0.3659716,0.1289237)" />
++  </defs>
++  <sodipodi:namedview
++     id="base"
++     pagecolor="#ffffff"
++     bordercolor="#e0e0e0"
++     borderopacity="1"
++     gridtolerance="10000"
++     guidetolerance="10"
++     objecttolerance="10"
++     inkscape:pageopacity="0.0"
++     inkscape:pageshadow="2"
++     inkscape:zoom="1"
++     inkscape:cx="21.888246"
++     inkscape:cy="13.442716"
++     inkscape:document-units="px"
++     inkscape:current-layer="layer1"
++     width="22px"
++     height="22px"
++     inkscape:showpageshadow="false"
++     inkscape:window-width="1102"
++     inkscape:window-height="958"
++     inkscape:window-x="2117"
++     inkscape:window-y="82"
++     showgrid="false"
++     borderlayer="true" />
++  <metadata
++     id="metadata7859">
++    <rdf:RDF>
++      <cc:Work
++         rdf:about="">
++        <dc:format>image/svg+xml</dc:format>
++        <dc:type
++           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
++        <dc:creator>
++          <cc:Agent>
++            <dc:title>Jakub Steiner</dc:title>
++          </cc:Agent>
++        </dc:creator>
++        <dc:source>http://jimmac.musichall.cz</dc:source>
++        <cc:license
++           rdf:resource="http://creativecommons.org/licenses/GPL/2.0/" />
++        <dc:title>Gnome Session Properties</dc:title>
++      </cc:Work>
++      <cc:License
++         rdf:about="http://creativecommons.org/licenses/GPL/2.0/">
++        <cc:permits
++           rdf:resource="http://web.resource.org/cc/Reproduction" />
++        <cc:permits
++           rdf:resource="http://web.resource.org/cc/Distribution" />
++        <cc:requires
++           rdf:resource="http://web.resource.org/cc/Notice" />
++        <cc:permits
++           rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
++        <cc:requires
++           rdf:resource="http://web.resource.org/cc/ShareAlike" />
++        <cc:requires
++           rdf:resource="http://web.resource.org/cc/SourceCode" />
++      </cc:License>
++    </rdf:RDF>
++  </metadata>
++  <g
++     inkscape:label="Layer 1"
++     inkscape:groupmode="layer"
++     id="layer1">
++    <g
++       id="g5672"
++       style="opacity:0.53714288"
++       transform="matrix(0.4617581,0,0,0.6375656,-4.8917036e-2,-9.3215937)">
++      <rect
++         y="38"
++         x="7.7196383"
++         height="8.5036354"
++         width="32.123024"
++         id="rect4173"
++         style="opacity:1;color:#000000;fill:url(#linearGradient5670);fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1;stroke-linecap:round;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible" />
++      <path
++         sodipodi:nodetypes="cccc"
++         id="path5058"
++         d="M 39.842663,38.000295 C 39.842663,38.000295 39.842663,46.503461 39.842663,46.503461 C 43.268636,46.519469 48.125002,44.598333 48.125,42.25133 C 48.125,39.904328 44.30187,38.000295 39.842663,38.000295 z "
++         style="opacity:1;color:#000000;fill:url(#radialGradient5667);fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1;stroke-linecap:round;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible" />
++      <path
++         style="opacity:1;color:#000000;fill:url(#radialGradient5664);fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1;stroke-linecap:round;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible"
++         d="M 7.7196385,38.000295 C 7.7196385,38.000295 7.7196385,46.503461 7.7196385,46.503461 C 4.2936621,46.519469 -0.56270146,44.598333 -0.56270146,42.25133 C -0.56270146,39.904328 3.2604286,38.000295 7.7196385,38.000295 z "
++         id="path5018"
++         sodipodi:nodetypes="cccc" />
++    </g>
++    <rect
++       style="opacity:1;color:#000000;fill:#729fcf;fill-opacity:1;fill-rule:evenodd;stroke:#3465a4;stroke-width:1;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
++       id="rect4585"
++       width="18.984974"
++       height="16.920202"
++       x="1.4697493"
++       y="1.5550299"
++       rx="1.0119615"
++       ry="0.96491748" />
++    <rect
++       ry="2.2922091"
++       rx="2.2922091"
++       y="4.3838844"
++       x="2.5"
++       height="5"
++       width="43"
++       id="rect5606"
++       style="opacity:0.27999998;color:#000000;fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:2.34036613;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;filter:url(#filter5628);enable-background:accumulate"
++       transform="matrix(0.4281431,0,0,0.4264257,0.8323174,7.5101245e-3)" />
++    <rect
++       style="opacity:1;color:#000000;fill:url(#linearGradient5648);fill-opacity:1;fill-rule:evenodd;stroke:url(#linearGradient5656);stroke-width:1;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
++       id="rect5556"
++       width="18.984974"
++       height="1.9586804"
++       x="1.4697493"
++       y="1.5"
++       rx="1.0120357"
++       ry="0.89794111" />
++    <rect
++       ry="0.32291412"
++       rx="0.31787637"
++       y="1.9814546"
++       x="2.5"
++       height="15.518545"
++       width="16.999998"
++       id="rect5632"
++       style="opacity:0.52571429;color:#000000;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:url(#linearGradient5640);stroke-width:1;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate" />
++    <g
++       id="g5724"
++       transform="matrix(0.4754857,0,0,0.4735784,-1.225003,-0.5239366)">
++      <path
++         style="opacity:0.3142857;fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;filter:url(#filter5786)"
++         d="M 10.5,25.474874 L 20.5,15.474874 L 20.5,21.005204 L 40.5,21.005204 C 44.35508,21.005204 45.58678,20.95144 45.5,23 L 45.5,33 C 45.5,33 43.070425,29.988738 40.625,29.988738 L 20.5,29.988738 L 20.5,35.474874 L 10.5,25.474874 z "
++         id="path5738"
++         sodipodi:nodetypes="cccccccccc" />
++      <path
++         sodipodi:nodetypes="cccccccccc"
++         id="path5698"
++         d="M 10.5,23.279959 L 20.5,13.559918 L 20.5,19.090248 L 40.5,19.090248 C 44.35508,19.090248 45.58678,21.511358 45.5,23.559918 L 45.5,33 C 45.5,33 45.096959,27.513864 40.625,27.513864 L 20.5,27.513864 L 20.5,33 L 10.5,23.279959 z "
++         style="fill:url(#linearGradient5728);fill-opacity:1;fill-rule:evenodd;stroke:#555753;stroke-width:2.10734344px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
++      <path
++         d="M 18.125,18.8125 L 13.9375,23 L 18.09375,27.15625 C 18.269985,25.965284 19.296092,25.085764 20.5,25.09375 L 40.625,25.09375 C 41.541275,25.09375 42.352276,25.289567 43.09375,25.59375 L 43.09375,23 C 43.093144,22.968753 43.093144,22.937497 43.09375,22.90625 C 43.114981,22.405075 42.966583,21.933517 42.6875,21.625 C 42.408417,21.316483 41.921956,20.9375 40.5,20.9375 L 20.5,20.9375 C 19.287205,20.925631 18.271136,20.016516 18.125,18.8125 z "
++         inkscape:href="#path5698"
++         id="path5712"
++         style="opacity:0.62857145;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:url(#linearGradient5730);stroke-width:2.10734344px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
++         xlink:href="#path5698"
++         inkscape:original="M 20.5 13.5625 L 10.5 23.28125 L 20.5 33 L 20.5 27.5 L 40.625 27.5 C 45.096959 27.5 45.5 33 45.5 33 L 45.5 23.5625 C 45.58678 21.51394 44.35508 19.09375 40.5 19.09375 L 20.5 19.09375 L 20.5 13.5625 z "
++         inkscape:radius="-2.4160075"
++         sodipodi:type="inkscape:offset" />
++    </g>
++    <rect
++       ry="0.21563303"
++       rx="0.48622662"
++       y="1.9264256"
++       x="2.1244035"
++       height="0.57357448"
++       width="17.675669"
++       id="rect4627"
++       style="opacity:1;color:#000000;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:url(#linearGradient5604);stroke-width:0.99999988;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate" />
++  </g>
++</svg>
+diff --git a/data/icons/24x24/Makefile.am b/data/icons/24x24/Makefile.am
+new file mode 100644
+index 00000000..8c28888a
+--- /dev/null
++++ b/data/icons/24x24/Makefile.am
+@@ -0,0 +1,25 @@
++size = 24x24
++
++themedir = $(datadir)/icons/hicolor
++iconsdir = $(themedir)/$(size)/apps
++
++icons_DATA = session-properties.png
++
++gtk_update_icon_cache = gtk-update-icon-cache -f -t $(datadir)/icons/hicolor
++
++install-data-hook:
++	@-if test -z "$(DESTDIR)"; then \
++		echo "Updating Gtk icon cache."; \
++		$(gtk_update_icon_cache); \
++	else \
++		echo "*** Icon cache not updated. After install, run this:"; \
++		echo "***   $(gtk_update_icon_cache)"; \
++	fi
++
++uninstall-hook:
++	@rm -f  $(DESTDIR)$(themedir)/icon-theme.cache
++
++EXTRA_DIST =		\
++	$(icons_DATA)
++
++-include $(top_srcdir)/git.mk
+diff --git a/data/icons/24x24/session-properties.png b/data/icons/24x24/session-properties.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..ac81c7ad3b604a056ed02c86bcb2db97c78f4aed
+GIT binary patch
+literal 784
+zcmV+r1MmEaP)<h;3K|Lk000e1NJLTq000;O000;W1^@s6;CDUv00006VoOIv0RI60
+z0RN!9r;`8x010qNS#tmY3ljhU3ljkVnw%H_000McNliru*8va^BL?Mqi97%R0-Z@j
+zK~zY`?Um0<R8bViKllBZxi-!?TABSKBCJKaNJ1+pwW5VZrnzfV5pDV(TGb+=7D2xt
+zXlD?S7*rGyf}j;>KPZr(RZ;%TnP#T<=Dm6Ew$M?>9B0Z^(18c%aCzU)J?GqWFZ}B!
+zvd+01w_dJ}IQ2rPKNAoF5C}0P=Og$s9(Z*2%!z|DfSs4`mR#Ob^|P+FelBy4NYVQQ
+z6oVh$s2$rHGyns@86wbI>11TdkWpA{ar1q6G7!&XV<YR_>mBh%Gb;>V{azyFWe~bi
+zBtX&kYRt>V+T2Cc5DSRAjJ&vAbOxr8Bbf^b%v)3$huG^oxQUUX0fEH;ral|`u1##P
+zlg5T^f7An0&#i*7P<p;=5gX{F?a%@C@7+g#e=qUAD+R?pH0+8EXllJ!5D+jld?(4|
+zz#Tdcx6stsh;7?kyl`pyyo07`2qDlkE$0(LU|AMduV3Ty@H-=K4<_DrA$6C%&CS@h
+zjb&LRlSvYZ1c^j~R4RpS+oaQJT-U|(Jbd3rDTS1h9rX>!%&3;P2j#V`BrK2a2i-_1
+ziAJMDA`!yjFyU~RP$-0yl3*~1X`1M|K9d1}uImU?{t_87LTODq51)47`95u}M>u)v
+zI7$`1LV~h{>P^*!n_RklEuyBK$ItFFIXQ_^3Uf<aL4ae$`S__Hl}VE)gV`e%s#pWH
+z9lRL44?xw%twkNvvUOqJ_jTu)gLy*|Dz73^dlXHU7d;1Cx9{d#sL9CzOnmGqK`9Z?
+zwcmbN7G1@f-KUEN$Y6l9QK0~HrbMx!=dyD1F3rh!wA8I$(rp?~IS7;wlmX*YfZ?I<
+zPI9dC{H>m23ZXCU1ygSN$Jd)cYW_>H3|I*Svg!SWIe-m}PW%6@u>Ar9X6B0{qPS!L
+O0000<MNUMnLSTZ?w_y_i
+
+literal 0
+HcmV?d00001
+
+diff --git a/data/icons/32x32/Makefile.am b/data/icons/32x32/Makefile.am
+new file mode 100644
+index 00000000..bf4b9711
+--- /dev/null
++++ b/data/icons/32x32/Makefile.am
+@@ -0,0 +1,27 @@
++size = 32x32
++
++themedir = $(datadir)/icons/hicolor
++iconsdir = $(themedir)/$(size)/apps
++
++icons_DATA = session-properties.png
++icons_SOURCE = session-properties.svg
++
++gtk_update_icon_cache = gtk-update-icon-cache -f -t $(datadir)/icons/hicolor
++
++install-data-hook:
++	@-if test -z "$(DESTDIR)"; then \
++		echo "Updating Gtk icon cache."; \
++		$(gtk_update_icon_cache); \
++	else \
++		echo "*** Icon cache not updated. After install, run this:"; \
++		echo "***   $(gtk_update_icon_cache)"; \
++	fi
++
++uninstall-hook:
++	@rm -f  $(DESTDIR)$(themedir)/icon-theme.cache
++
++EXTRA_DIST =		\
++	$(icons_DATA)	\
++	$(icons_SOURCE)
++
++-include $(top_srcdir)/git.mk
+diff --git a/data/icons/32x32/session-properties.png b/data/icons/32x32/session-properties.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..25df9d3696b4339cfba5d18afdc8ad2662c6eb01
+GIT binary patch
+literal 1109
+zcmV-b1giUqP)<h;3K|Lk000e1NJLTq001BW001Be1^@s6b9#F800006VoOIv0RI60
+z0RN!9r;`8x00(qQO+^RS0T2)e0R8dJuK)l8_en%SR9J=OmfuetRTRfRcV-8W*|HU(
+z6x#(%lZrlQV~L4xf<Bq}5BS<zUwk53ew!w3jfIB92V+}J)6ggy^+A0xNU)|qLRo&K
+z!Pwe_A2k6&DzFSJ%<j$)9~O3Jb_e!{L?8SnH}}rD=bZ01=iWKF@PCH@X#4m|bKO%`
+zw<4SJ-Xs-UnYX^u)^SrdXO^VX=ifci>jOCUOrWQ}?uexLlr3kGN|uWD_;#<|u5RK)
+zY+`Mgak=WxnI0e^pt9nCR9kxlwNy<@njb{gPyyI%>YIck8xnvI;QB91>{F*GDcX}0
+z$O=7X^4Y)wNdc3yI{oAS4tWAH_omhWkdh{;@Y3f^@8I$|jizODC^81o)xt8D1ehy5
+zUbp}NqN_AFHy6a;+uIAJ+5J2P_+$w%lN)C)4`SPPPQ*e8&b;$_&O#Gh=>i<8Y};ny
+z!CYPfa`jE;N*#fmGFq0!x7}~;nj{{NqbQ0iCRaGQcC3JDn(Txdzuv&MEgD~KO4`yp
+z=5BCuB@e@wRsqvAJ;$xvx9Gcmjg^%Zmpz{f_`E70OR0-tSr&$2WCRZ19VQgI%iAYU
+zp=p}SN0xJMWKJ&6Mznnd&T;3?ZAM0h>FoG``e*Ais+7+q+~GIOJc4b6LL-cgkJ8%G
+zj;`yht*`ULkKgn2;6Tzx2$86Wc$mq!l{y|Xk<<#-kH3~Fz^Te9V01LZ#JvexTiVey
+zjc7DV@NkeTmp*rM2;rL3*N~{}`1lx~T>2D6ys~=*48ve_EX3q*leC_0L(?>LT?b%!
+zdD)d%k|bnV_8i-LLI{Kq)YR1Sazg{l!w=E~I4*{5+pL6F=>O_V`oH*^SS*$#|EDkv
+zgFs+EMV6Kj?^OYS;Nc)APn@Eovkgg-C@syQ$>)f~lPz&+Gwy(0RL0e-R{@AbA}lN{
+z(%IF{xw9VvpzAv2<>js}=t<(ym~7joxVYG5%MdW{Z%FNygZktuQ}>5x@9N<E*>k9>
+z%JlRU-4`z)$qo_1HF-i&6l!bh2>AE81SH;OvUg~SKfuA~nwYsiL`PRA7ccZsRu&*E
+zsxXTW?n38{#fOW?+6X9R0Kx}Ug1bBIBx3saA>M0wpQgq}Dr=774`zRSIAIzwRv*t3
+z|6`t*t^rg?fFE|QfKx>E^G(cXDt&#|Fr$&Y$N^+u5#`l&)EzyxZSwm7NnnTP9<S|x
+z<E82>DXP(4sABZyPdr@{r2fTh{@!?W=uHM@4}{@6;R807W=7gCe`9}SA(iEpq7oiO
+z;O1aK0wgSLd3LN7*c3o9Pyqx06|jLP3d)=vn_F`P2m^mP4_*aI00qbIxyOhD2C(4}
+b^WWlc-6EIuR>CZG00000NkvXXu0mjfn7$9&
+
+literal 0
+HcmV?d00001
+
+diff --git a/data/icons/32x32/session-properties.svg b/data/icons/32x32/session-properties.svg
+new file mode 100644
+index 00000000..5bb14559
+--- /dev/null
++++ b/data/icons/32x32/session-properties.svg
+@@ -0,0 +1,490 @@
++<?xml version="1.0" encoding="UTF-8" standalone="no"?>
++<!-- Created with Inkscape (http://www.inkscape.org/) -->
++<svg
++   xmlns:dc="http://purl.org/dc/elements/1.1/"
++   xmlns:cc="http://web.resource.org/cc/"
++   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
++   xmlns:svg="http://www.w3.org/2000/svg"
++   xmlns="http://www.w3.org/2000/svg"
++   xmlns:xlink="http://www.w3.org/1999/xlink"
++   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
++   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
++   width="32"
++   height="32"
++   id="svg7854"
++   sodipodi:version="0.32"
++   inkscape:version="0.44+devel"
++   version="1.0"
++   sodipodi:docname="session-properties.svg"
++   sodipodi:docbase="/home/jimmac/gfx/ximian/art/icons/control-center/scalable"
++   inkscape:output_extension="org.inkscape.output.svg.inkscape"
++   sodipodi:modified="true">
++  <defs
++     id="defs7856">
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5650">
++      <stop
++         style="stop-color:#d3d7cf;stop-opacity:1;"
++         offset="0"
++         id="stop5652" />
++      <stop
++         style="stop-color:#9ea795;stop-opacity:1"
++         offset="1"
++         id="stop5654" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5642">
++      <stop
++         style="stop-color:#eeeeec;stop-opacity:1;"
++         offset="0"
++         id="stop5644" />
++      <stop
++         style="stop-color:#c3c3bc;stop-opacity:1"
++         offset="1"
++         id="stop5646" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5634">
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1;"
++         offset="0"
++         id="stop5636" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:0;"
++         offset="1"
++         id="stop5638" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5598">
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1;"
++         offset="0"
++         id="stop5600" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:0;"
++         offset="1"
++         id="stop5602" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5716">
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1;"
++         offset="0"
++         id="stop5718" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:0;"
++         offset="1"
++         id="stop5720" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5700">
++      <stop
++         style="stop-color:#e4e4e4;stop-opacity:1;"
++         offset="0"
++         id="stop5702" />
++      <stop
++         id="stop5708"
++         offset="0.639386"
++         style="stop-color:#fefefe;stop-opacity:1" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1"
++         offset="0.79632628"
++         id="stop5710" />
++      <stop
++         style="stop-color:#949494;stop-opacity:1"
++         offset="1"
++         id="stop5704" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient3832">
++      <stop
++         id="stop3834"
++         offset="0.0000000"
++         style="stop-color:#ffffff;stop-opacity:1.0000000" />
++      <stop
++         id="stop3836"
++         offset="1.0000000"
++         style="stop-color:#e0e0e0;stop-opacity:1.0000000" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient4816">
++      <stop
++         id="stop4818"
++         offset="0.0000000"
++         style="stop-color:#204a87;stop-opacity:1.0000000" />
++      <stop
++         id="stop4820"
++         offset="1.0000000"
++         style="stop-color:#204a87;stop-opacity:0.0000000" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient5048">
++      <stop
++         id="stop5050"
++         offset="0"
++         style="stop-color:black;stop-opacity:0;" />
++      <stop
++         style="stop-color:black;stop-opacity:1;"
++         offset="0.5"
++         id="stop5056" />
++      <stop
++         id="stop5052"
++         offset="1"
++         style="stop-color:black;stop-opacity:0;" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient5060"
++       inkscape:collect="always">
++      <stop
++         id="stop5062"
++         offset="0"
++         style="stop-color:black;stop-opacity:1;" />
++      <stop
++         id="stop5064"
++         offset="1"
++         style="stop-color:black;stop-opacity:0;" />
++    </linearGradient>
++    <radialGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5060"
++       id="radialGradient5664"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(-6.6526975e-2,0,0,3.5014969e-2,47.812816,25.161837)"
++       cx="605.71429"
++       cy="486.64789"
++       fx="605.71429"
++       fy="486.64789"
++       r="117.14286" />
++    <radialGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5060"
++       id="radialGradient5667"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(6.6526975e-2,0,0,3.5014969e-2,-0.2505064,25.161837)"
++       cx="605.71429"
++       cy="486.64789"
++       fx="605.71429"
++       fy="486.64789"
++       r="117.14286" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5048"
++       id="linearGradient5670"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(6.6526975e-2,0,0,3.5014969e-2,-0.2635996,25.161837)"
++       x1="302.85715"
++       y1="366.64789"
++       x2="302.85715"
++       y2="609.50507" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient3832"
++       id="linearGradient5682"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(1.4257653,0,0,1.3494809,-45.841705,7.4048427)"
++       x1="17.88068"
++       y1="11.072588"
++       x2="17.88068"
++       y2="21.767578" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient4816"
++       id="linearGradient5684"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(1.2803684,0,0,1.2242141,-43.519693,10.324658)"
++       x1="13.050564"
++       y1="11.353518"
++       x2="13.050564"
++       y2="5.6173568" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient3832"
++       id="linearGradient5694"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(1.367592,0,0,1.259127,-45.521751,9.5621318)"
++       x1="17.88068"
++       y1="11.072588"
++       x2="17.88068"
++       y2="21.767578" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient4816"
++       id="linearGradient5696"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(1.325819,0,0,1.19936,-44.590631,11.169522)"
++       x1="13.050564"
++       y1="11.353518"
++       x2="13.050564"
++       y2="5.6173568" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5700"
++       id="linearGradient5728"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="translate(0.5,0)"
++       x1="24"
++       y1="23"
++       x2="45.505005"
++       y2="23" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5716"
++       id="linearGradient5730"
++       gradientUnits="userSpaceOnUse"
++       x1="40.745819"
++       y1="23"
++       x2="44.005268"
++       y2="23" />
++    <filter
++       inkscape:collect="always"
++       id="filter5786">
++      <feGaussianBlur
++         inkscape:collect="always"
++         stdDeviation="0.62861987"
++         id="feGaussianBlur5788" />
++    </filter>
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5598"
++       id="linearGradient5604"
++       x1="25.627417"
++       y1="8"
++       x2="25.627417"
++       y2="4.7617435"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(0.6585366,0,0,0.448956,0.195122,1.1328299)" />
++    <filter
++       inkscape:collect="always"
++       x="-0.019480519"
++       width="1.0389611"
++       y="-0.14285713"
++       height="1.2857143"
++       id="filter5628">
++      <feGaussianBlur
++         inkscape:collect="always"
++         stdDeviation="0.42857143"
++         id="feGaussianBlur5630" />
++    </filter>
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5634"
++       id="linearGradient5640"
++       x1="25.313259"
++       y1="42.656792"
++       x2="25.313261"
++       y2="10.129107"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(0.6609814,0,0,0.6406647,8.63294e-2,0.2717499)" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5642"
++       id="linearGradient5648"
++       x1="26.29347"
++       y1="7.3125"
++       x2="26.232994"
++       y2="3.5357027"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(0.6744186,0,0,0.6,-0.1860466,0.4000001)" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5650"
++       id="linearGradient5656"
++       x1="26.29347"
++       y1="7.3125"
++       x2="26.232994"
++       y2="3.5357027"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(0.6744186,0,0,0.6,-0.1860466,0.4000001)" />
++  </defs>
++  <sodipodi:namedview
++     id="base"
++     pagecolor="#ffffff"
++     bordercolor="#e0e0e0"
++     borderopacity="1"
++     gridtolerance="10000"
++     guidetolerance="10"
++     objecttolerance="10"
++     inkscape:pageopacity="0.0"
++     inkscape:pageshadow="2"
++     inkscape:zoom="1"
++     inkscape:cx="31.400129"
++     inkscape:cy="-4.050017"
++     inkscape:document-units="px"
++     inkscape:current-layer="layer1"
++     width="32px"
++     height="32px"
++     inkscape:showpageshadow="false"
++     inkscape:window-width="1102"
++     inkscape:window-height="958"
++     inkscape:window-x="2117"
++     inkscape:window-y="82"
++     showgrid="false" />
++  <metadata
++     id="metadata7859">
++    <rdf:RDF>
++      <cc:Work
++         rdf:about="">
++        <dc:format>image/svg+xml</dc:format>
++        <dc:type
++           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
++        <dc:creator>
++          <cc:Agent>
++            <dc:title>Jakub Steiner</dc:title>
++          </cc:Agent>
++        </dc:creator>
++        <dc:source>http://jimmac.musichall.cz</dc:source>
++        <cc:license
++           rdf:resource="http://creativecommons.org/licenses/GPL/2.0/" />
++        <dc:title>Gnome Session Properties</dc:title>
++      </cc:Work>
++      <cc:License
++         rdf:about="http://creativecommons.org/licenses/GPL/2.0/">
++        <cc:permits
++           rdf:resource="http://web.resource.org/cc/Reproduction" />
++        <cc:permits
++           rdf:resource="http://web.resource.org/cc/Distribution" />
++        <cc:requires
++           rdf:resource="http://web.resource.org/cc/Notice" />
++        <cc:permits
++           rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
++        <cc:requires
++           rdf:resource="http://web.resource.org/cc/ShareAlike" />
++        <cc:requires
++           rdf:resource="http://web.resource.org/cc/SourceCode" />
++      </cc:License>
++    </rdf:RDF>
++  </metadata>
++  <g
++     inkscape:label="Layer 1"
++     inkscape:groupmode="layer"
++     id="layer1">
++    <g
++       id="g5672"
++       style="opacity:0.53714288"
++       transform="matrix(0.7053465,0,0,0.9765232,-0.8197989,-14.074824)">
++      <rect
++         y="38"
++         x="7.7196383"
++         height="8.5036354"
++         width="32.123024"
++         id="rect4173"
++         style="opacity:1;color:#000000;fill:url(#linearGradient5670);fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1;stroke-linecap:round;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible" />
++      <path
++         sodipodi:nodetypes="cccc"
++         id="path5058"
++         d="M 39.842663,38.000295 C 39.842663,38.000295 39.842663,46.503461 39.842663,46.503461 C 43.268636,46.519469 48.125002,44.598333 48.125,42.25133 C 48.125,39.904328 44.30187,38.000295 39.842663,38.000295 z "
++         style="opacity:1;color:#000000;fill:url(#radialGradient5667);fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1;stroke-linecap:round;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible" />
++      <path
++         style="opacity:1;color:#000000;fill:url(#radialGradient5664);fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1;stroke-linecap:round;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible"
++         d="M 7.7196385,38.000295 C 7.7196385,38.000295 7.7196385,46.503461 7.7196385,46.503461 C 4.2936621,46.519469 -0.56270146,44.598333 -0.56270146,42.25133 C -0.56270146,39.904328 3.2604286,38.000295 7.7196385,38.000295 z "
++         id="path5018"
++         sodipodi:nodetypes="cccc" />
++    </g>
++    <rect
++       style="opacity:1;color:#000000;fill:#729fcf;fill-opacity:1;fill-rule:evenodd;stroke:#3465a4;stroke-width:1;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
++       id="rect4585"
++       width="29"
++       height="25.915714"
++       x="1.5"
++       y="2.5842862"
++       rx="1.5457952"
++       ry="1.4779093" />
++    <rect
++       ry="2.2922091"
++       rx="2.2922091"
++       y="4.3838844"
++       x="2.5"
++       height="5"
++       width="43"
++       id="rect5606"
++       style="opacity:0.27999998;color:#000000;fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1.53006899;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;filter:url(#filter5628);enable-background:accumulate"
++       transform="matrix(0.6539988,0,0,0.6531321,0.5263077,0.2140377)" />
++    <rect
++       style="opacity:1;color:#000000;fill:url(#linearGradient5648);fill-opacity:1;fill-rule:evenodd;stroke:url(#linearGradient5656);stroke-width:1;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
++       id="rect5556"
++       width="29"
++       height="3"
++       x="1.5"
++       y="2.5"
++       rx="1.5459085"
++       ry="1.3753254" />
++    <rect
++       ry="0.50486249"
++       rx="0.50486249"
++       y="3.2374167"
++       x="2.5"
++       height="24.262585"
++       width="27.000004"
++       id="rect5632"
++       style="opacity:0.52571429;color:#000000;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:url(#linearGradient5640);stroke-width:1;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate" />
++    <g
++       id="g5677"
++       transform="matrix(0.6539988,0,0,0.6531321,29.351952,-3.3803525)">
++      <rect
++         id="rect3818"
++         style="color:#000000;fill:url(#linearGradient5682);fill-opacity:1;fill-rule:evenodd;stroke:#8d8d8d;stroke-width:1.5300703;stroke-linecap:butt;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible"
++         y="18.189814"
++         x="-37.999996"
++         ry="0.57820499"
++         rx="0.56373626"
++         height="21.435171"
++         width="22.935822" />
++      <rect
++         id="rect3820"
++         style="color:#000000;fill:url(#linearGradient5684);fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible"
++         y="20.486441"
++         x="-35.706413"
++         ry="0.097232968"
++         rx="0.09710411"
++         height="3.0621684"
++         width="18.348656" />
++      <rect
++         id="rect4962"
++         style="color:#000000;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#ffffff;stroke-width:1.53007114;stroke-linecap:butt;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:0.47878789;visibility:visible;display:inline;overflow:visible"
++         y="19.7209"
++         x="-36.47094"
++         ry="0.16788077"
++         rx="0.18690105"
++         height="18.373005"
++         width="19.877708" />
++    </g>
++    <g
++       id="g5724"
++       transform="matrix(0.6539988,0,0,0.6531321,0.5263077,5.4390943)">
++      <path
++         style="opacity:0.3142857;fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;filter:url(#filter5786)"
++         d="M 10.5,25.474874 L 20.5,15.474874 L 20.5,21.005204 L 40.5,21.005204 C 44.35508,21.005204 45.58678,20.95144 45.5,23 L 45.5,33 C 45.5,33 43.070425,29.988738 40.625,29.988738 L 20.5,29.988738 L 20.5,35.474874 L 10.5,25.474874 z "
++         id="path5738"
++         sodipodi:nodetypes="cccccccccc" />
++      <path
++         sodipodi:nodetypes="cccccccccc"
++         id="path5698"
++         d="M 10.5,23 L 20.5,13 L 20.5,18.53033 L 40.5,18.53033 C 44.35508,18.53033 45.58678,20.95144 45.5,23 L 45.5,33 C 45.5,33 45.096959,27.513864 40.625,27.513864 L 20.5,27.513864 L 20.5,33 L 10.5,23 z "
++         style="fill:url(#linearGradient5728);fill-opacity:1;fill-rule:evenodd;stroke:#555753;stroke-width:1.53006899px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
++      <path
++         d="M 19.1875,16.1875 L 12.375,23 L 19.1875,29.8125 L 19.1875,27.5 C 19.191541,26.776807 19.776807,26.191541 20.5,26.1875 L 40.625,26.1875 C 42.124779,26.1875 43.279176,26.742626 44.1875,27.5 L 44.1875,23 C 44.187007,22.97917 44.187007,22.95833 44.1875,22.9375 C 44.218785,22.19897 44.005899,21.434255 43.5,20.875 C 42.994101,20.315745 42.151361,19.84375 40.5,19.84375 L 20.5,19.84375 C 19.776807,19.839709 19.191541,19.254443 19.1875,18.53125 L 19.1875,16.1875 z "
++         inkscape:href="#path5698"
++         id="path5712"
++         style="fill:none;fill-opacity:1;fill-rule:evenodd;stroke:url(#linearGradient5730);stroke-width:1.53006899px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
++         xlink:href="#path5698"
++         inkscape:original="M 20.5 13 L 10.5 23 L 20.5 33 L 20.5 27.5 L 40.625 27.5 C 45.096959 27.5 45.5 33 45.5 33 L 45.5 23 C 45.58678 20.95144 44.35508 18.531249 40.5 18.53125 L 20.5 18.53125 L 20.5 13 z "
++         inkscape:radius="-1.3197637"
++         sodipodi:type="inkscape:offset" />
++    </g>
++    <rect
++       ry="0.50634968"
++       rx="0.74272269"
++       y="3.153132"
++       x="2.5"
++       height="1.346868"
++       width="27.000002"
++       id="rect4627"
++       style="opacity:1;color:#000000;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:url(#linearGradient5604);stroke-width:0.99999994;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate" />
++  </g>
++</svg>
+diff --git a/data/icons/48x48/Makefile.am b/data/icons/48x48/Makefile.am
+new file mode 100644
+index 00000000..13b0cf36
+--- /dev/null
++++ b/data/icons/48x48/Makefile.am
+@@ -0,0 +1,25 @@
++size = 48x48
++
++themedir = $(datadir)/icons/hicolor
++iconsdir = $(themedir)/$(size)/apps
++
++icons_DATA = session-properties.png
++
++gtk_update_icon_cache = gtk-update-icon-cache -f -t $(datadir)/icons/hicolor
++
++install-data-hook:
++	@-if test -z "$(DESTDIR)"; then \
++		echo "Updating Gtk icon cache."; \
++		$(gtk_update_icon_cache); \
++	else \
++		echo "*** Icon cache not updated. After install, run this:"; \
++		echo "***   $(gtk_update_icon_cache)"; \
++	fi
++
++uninstall-hook:
++	@rm -f  $(DESTDIR)$(themedir)/icon-theme.cache
++
++EXTRA_DIST =		\
++	$(icons_DATA)
++
++-include $(top_srcdir)/git.mk
+diff --git a/data/icons/48x48/session-properties.png b/data/icons/48x48/session-properties.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..32c2358ca45a07e86fbb03d75ec4742e8203091a
+GIT binary patch
+literal 1839
+zcmV+~2hjM5P)<h;3K|Lk000e1NJLTq001xm001xu1^@s6R|5Hm00004b3#c}2nYxW
+zd<bNS00009a7bBm000fw000fw0YWI7cmMzZ8FWQhbW?9;ba!ELWdL_~cP?peYja~^
+zaAhuUa%Y?FJQ@H12CPX$K~!jg)tOst99JF2f9K5X?0PR=-<>o(6r8k8?YI(DKwnU$
+zs<G>cQXx?!c!0iv$|d3jp#tKO3Mop|HfdwiG^%(Bv{YDXBhor03QDNj@<7u-QR}Ec
+zVmpa1^{zMG*>esLv%B8Q?96WL#>pp*>^W!7Io~(`|9394!WhG?47u3^){9$SfL;3M
+z;O`G6Kbf~)=uVkOY^kjqNkSk%G`=sEP%uKzEQ;faSmfJ3{?2z7p+dmQlJnw@ZOKQr
+zboJpxqV<Ca(Nq}->Wlr$ygr&M18@s@xn<$<*n9uUyaL=`79fO>e|+r^U%h+#PIN(`
+zwf+>yR5$X<!^?{Nihm`&J^cvlUtbYINMnpHML;Iw?Xsu4kCki|rIhc$>m?ILu%@)`
+zg-9uhwY8C)y(IAbTNYs6I=^u3t{u6y{{F2<c|$GGG>p;AU7h32cP;`LSo46HJUh3X
+zZvRKyeM6UVA~)ycly^06ou6a!>?~9YFvjRFfA4pNv(t*do<E0j-Oc3L5LP5YvZEIr
+zNn?!BP%#S$X_4yaBNp3+;pSYO1p+AqLS8MG*;Nl%5-H_PO5cN&)rPMUV2R=a(xig^
+z)qi4VFK!gKG75>?n2p}$TPH<;fLe87u(KE0yLT^AZk*}0*6iQE9~ua-f+8S=muIbb
+zKuXDzN8a3!v=hKjAG<$fyz2Y<2(*wwB~1TszO@GHKyV5P(ej%##xQ+xo{czG2;ub?
+zgg_HZ0h-p#X^i33rygsKX-I!Tu)<8NP4nj5w{IWDn2OEc`Vlr}pa(1|D5$lL!p!O5
+zy)mU!xlAdAWnKSX%70_GhCmMpArNAXa+o>qh*K2-r4)yreTE-A{-c&iS0Xfp!aPvf
+zQJ6XJ*s&%+DaCV#pXKd$-d<Nqg$byQP{W0+8FL;uZ~(0}`Fx)7iNg#H?c&_~?^UH#
+zs|XWs)p(%lwlcp;Z#L)xC=?1D9)FI(!6EjH?LkV3QYy4<qibE$s3k@Dyi{vWKNw>;
+zc<331hITPJGFl!ypU)GCL;~9e^%;cPX|yH+Ysbd02)M4x^o5TY92{hHWRxpcu9OGg
+zv<Ud6kRM8h-TmNhMs|DTOVR4-?%|1F{49_}7`$=+?(qPeL?^PX8|SuR<ksN;0Tt>>
+zGm9Vj@rlC>4i1&yeCfI6<z=4y^>0Gw@=7%GY&M(a-23O4IPyFnW-kDJ4Fm{LmqNAV
+zCw@C#&iP960GUjNOeW(?Qc4+k`8`uYJRWEJz;=H4{l|Iw(9<N`{2J#f0Tp+(9&lYZ
+zko>2OLZN^Vf-l|sMS2S#Ac~=D$^%L%j=b<Z!@GtV*#z<>Xszk(?L(*xc--Ck6e>=n
+zl^#$^h0YE)3XbD|R#5yxR+B>h3z-mtN5An+&YV5NYsX)ur>AFK8@7!^{a&bniF3Ie
+zU-<mJoIH6FV_@u|u}w>*O4LoGjaFjEap>&qEQ*){>O~|H2~w$43tzIEe<l)%)Yb=^
+zxE9f9l>Ywy^1YvkR4T>KfB6J6GnYciHVfOf8Q6X&0|TF9;P%hf*H_+DuF^^=(&=>7
+z!|8OIbUIBknIw@&aO%`wszeAOn3=i6gAa_<4WzYZYHEu4)Noy0Fbr2N<aqbrXXuo#
+z^U&yMfB@+&WNv&bM~@!$@6H%p*JWvGiEL(tmtTGfV+?!7_LM_>`t)hvwsyxhoJgWY
+z`UXs#LLtpU_5vr~II&h$E1-1RnTzd&*v^1n4Q}T(Ru|^T&d+dc@&q9G+QScf^>;st
+zW!3LSEug=yG#FYd3hpY`vP<L~ht;KbtLp2Ils-Q|)IkU$PK;!yw<lQ!j!pg<Ap}}$
+zoLC&oc3Py`0LEZUl2|-NG@hb6xy&aEm&?_%NL(0WWbJ9ESrMtOE#y0QacuGgxm*sv
+zUtz8rLLj8Xc48#jySa1tzEX_?YY}KS+P#`t$#3aMM98idS{4D2vmI<{hcvo=bhWpU
+z>h9&^)K~^yN(mwIwh+PwqRX?>FTU}&-d}zFft|5?ZtrNRV`B{Y)vYWpTt#pXUA=wS
+z_Vt~}f{@9%96$4cTFERP1EN6G#`_qjKAd{$6)Au6nUDT^`CA&RtM%>;Mk|cgNISxY
+zrcn_By^>qJ^rw$cjZXjtU{x4n5JE(NE}*@5C4e@-#S_@tI4yr3ZU_ye0R`lNERX?~
+zfLUXVCjcnzuiNkhwBdzF7aMLSl0_aao`5A_#T1DPzio0+j07;oY}#(E$iu>ms5U-i
+deFfY~_&?#hc%)mzygmQ`002ovPDHLkV1i5*a;5+P
+
+literal 0
+HcmV?d00001
+
+diff --git a/data/icons/Makefile.am b/data/icons/Makefile.am
+new file mode 100644
+index 00000000..8b6c5491
+--- /dev/null
++++ b/data/icons/Makefile.am
+@@ -0,0 +1,3 @@
++SUBDIRS = 16x16 22x22 24x24 32x32 48x48 scalable symbolic
++
++-include $(top_srcdir)/git.mk
+diff --git a/data/icons/scalable/Makefile.am b/data/icons/scalable/Makefile.am
+new file mode 100644
+index 00000000..4ff67b7b
+--- /dev/null
++++ b/data/icons/scalable/Makefile.am
+@@ -0,0 +1,25 @@
++size = scalable
++
++themedir = $(datadir)/icons/hicolor
++iconsdir = $(themedir)/$(size)/apps
++
++icons_DATA = session-properties.svg
++
++gtk_update_icon_cache = gtk-update-icon-cache -f -t $(datadir)/icons/hicolor
++
++install-data-hook:
++	@-if test -z "$(DESTDIR)"; then \
++		echo "Updating Gtk icon cache."; \
++		$(gtk_update_icon_cache); \
++	else \
++		echo "*** Icon cache not updated. After install, run this:"; \
++		echo "***   $(gtk_update_icon_cache)"; \
++	fi
++
++uninstall-hook:
++	@rm -f  $(DESTDIR)$(themedir)/icon-theme.cache
++
++EXTRA_DIST =		\
++	$(icons_DATA)
++
++-include $(top_srcdir)/git.mk
+diff --git a/data/icons/scalable/session-properties.svg b/data/icons/scalable/session-properties.svg
+new file mode 100644
+index 00000000..cec2c39e
+--- /dev/null
++++ b/data/icons/scalable/session-properties.svg
+@@ -0,0 +1,515 @@
++<?xml version="1.0" encoding="UTF-8" standalone="no"?>
++<!-- Created with Inkscape (http://www.inkscape.org/) -->
++<svg
++   xmlns:dc="http://purl.org/dc/elements/1.1/"
++   xmlns:cc="http://web.resource.org/cc/"
++   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
++   xmlns:svg="http://www.w3.org/2000/svg"
++   xmlns="http://www.w3.org/2000/svg"
++   xmlns:xlink="http://www.w3.org/1999/xlink"
++   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
++   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
++   width="48"
++   height="48"
++   id="svg7854"
++   sodipodi:version="0.32"
++   inkscape:version="0.44+devel"
++   version="1.0"
++   sodipodi:docname="session-properties.svg"
++   sodipodi:docbase="/home/jimmac/gfx/ximian/art/icons/control-center/scalable"
++   inkscape:output_extension="org.inkscape.output.svg.inkscape"
++   sodipodi:modified="true">
++  <defs
++     id="defs7856">
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5650">
++      <stop
++         style="stop-color:#d3d7cf;stop-opacity:1;"
++         offset="0"
++         id="stop5652" />
++      <stop
++         style="stop-color:#9ea795;stop-opacity:1"
++         offset="1"
++         id="stop5654" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5642">
++      <stop
++         style="stop-color:#eeeeec;stop-opacity:1;"
++         offset="0"
++         id="stop5644" />
++      <stop
++         style="stop-color:#c3c3bc;stop-opacity:1"
++         offset="1"
++         id="stop5646" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5634">
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1;"
++         offset="0"
++         id="stop5636" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:0;"
++         offset="1"
++         id="stop5638" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5598">
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1;"
++         offset="0"
++         id="stop5600" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:0;"
++         offset="1"
++         id="stop5602" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5716">
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1;"
++         offset="0"
++         id="stop5718" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:0;"
++         offset="1"
++         id="stop5720" />
++    </linearGradient>
++    <linearGradient
++       inkscape:collect="always"
++       id="linearGradient5700">
++      <stop
++         style="stop-color:#e4e4e4;stop-opacity:1;"
++         offset="0"
++         id="stop5702" />
++      <stop
++         id="stop5708"
++         offset="0.639386"
++         style="stop-color:#fefefe;stop-opacity:1" />
++      <stop
++         style="stop-color:#ffffff;stop-opacity:1"
++         offset="0.79632628"
++         id="stop5710" />
++      <stop
++         style="stop-color:#949494;stop-opacity:1"
++         offset="1"
++         id="stop5704" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient3832">
++      <stop
++         id="stop3834"
++         offset="0.0000000"
++         style="stop-color:#ffffff;stop-opacity:1.0000000" />
++      <stop
++         id="stop3836"
++         offset="1.0000000"
++         style="stop-color:#e0e0e0;stop-opacity:1.0000000" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient4816">
++      <stop
++         id="stop4818"
++         offset="0.0000000"
++         style="stop-color:#204a87;stop-opacity:1.0000000" />
++      <stop
++         id="stop4820"
++         offset="1.0000000"
++         style="stop-color:#204a87;stop-opacity:0.0000000" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient5048">
++      <stop
++         id="stop5050"
++         offset="0"
++         style="stop-color:black;stop-opacity:0;" />
++      <stop
++         style="stop-color:black;stop-opacity:1;"
++         offset="0.5"
++         id="stop5056" />
++      <stop
++         id="stop5052"
++         offset="1"
++         style="stop-color:black;stop-opacity:0;" />
++    </linearGradient>
++    <linearGradient
++       id="linearGradient5060"
++       inkscape:collect="always">
++      <stop
++         id="stop5062"
++         offset="0"
++         style="stop-color:black;stop-opacity:1;" />
++      <stop
++         id="stop5064"
++         offset="1"
++         style="stop-color:black;stop-opacity:0;" />
++    </linearGradient>
++    <radialGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5060"
++       id="radialGradient5664"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(-6.6526975e-2,0,0,3.5014969e-2,47.812816,25.161837)"
++       cx="605.71429"
++       cy="486.64789"
++       fx="605.71429"
++       fy="486.64789"
++       r="117.14286" />
++    <radialGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5060"
++       id="radialGradient5667"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(6.6526975e-2,0,0,3.5014969e-2,-0.2505064,25.161837)"
++       cx="605.71429"
++       cy="486.64789"
++       fx="605.71429"
++       fy="486.64789"
++       r="117.14286" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5048"
++       id="linearGradient5670"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(6.6526975e-2,0,0,3.5014969e-2,-0.2635996,25.161837)"
++       x1="302.85715"
++       y1="366.64789"
++       x2="302.85715"
++       y2="609.50507" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient3832"
++       id="linearGradient5682"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(1.367592,0,0,1.259127,-45.521751,9.5621318)"
++       x1="17.880680"
++       y1="11.072588"
++       x2="17.880680"
++       y2="21.767578" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient4816"
++       id="linearGradient5684"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(1.325819,0,0,1.19936,-44.590631,11.169522)"
++       x1="13.050564"
++       y1="11.353518"
++       x2="13.050564"
++       y2="5.6173568" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient3832"
++       id="linearGradient5694"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(1.367592,0,0,1.259127,-45.521751,9.5621318)"
++       x1="17.880680"
++       y1="11.072588"
++       x2="17.880680"
++       y2="21.767578" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient4816"
++       id="linearGradient5696"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="matrix(1.325819,0,0,1.19936,-44.590631,11.169522)"
++       x1="13.050564"
++       y1="11.353518"
++       x2="13.050564"
++       y2="5.6173568" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5700"
++       id="linearGradient5728"
++       gradientUnits="userSpaceOnUse"
++       gradientTransform="translate(0.5,0)"
++       x1="24"
++       y1="23"
++       x2="45.505004"
++       y2="23" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5716"
++       id="linearGradient5730"
++       gradientUnits="userSpaceOnUse"
++       x1="40.745819"
++       y1="23"
++       x2="44.005268"
++       y2="23" />
++    <filter
++       inkscape:collect="always"
++       id="filter5786">
++      <feGaussianBlur
++         inkscape:collect="always"
++         stdDeviation="0.62861987"
++         id="feGaussianBlur5788" />
++    </filter>
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5598"
++       id="linearGradient5604"
++       x1="25.627417"
++       y1="8"
++       x2="25.627417"
++       y2="4.7617435"
++       gradientUnits="userSpaceOnUse" />
++    <filter
++       inkscape:collect="always"
++       x="-0.019480519"
++       width="1.038961"
++       y="-0.14285714"
++       height="1.2857143"
++       id="filter5628">
++      <feGaussianBlur
++         inkscape:collect="always"
++         stdDeviation="0.42857143"
++         id="feGaussianBlur5630" />
++    </filter>
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5634"
++       id="linearGradient5640"
++       x1="25.313259"
++       y1="42.656792"
++       x2="25.313261"
++       y2="10.129107"
++       gradientUnits="userSpaceOnUse" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5642"
++       id="linearGradient5648"
++       x1="26.29347"
++       y1="7.3125"
++       x2="26.232994"
++       y2="3.5357027"
++       gradientUnits="userSpaceOnUse" />
++    <linearGradient
++       inkscape:collect="always"
++       xlink:href="#linearGradient5650"
++       id="linearGradient5656"
++       x1="26.29347"
++       y1="7.3125"
++       x2="26.232994"
++       y2="3.5357027"
++       gradientUnits="userSpaceOnUse" />
++  </defs>
++  <sodipodi:namedview
++     id="base"
++     pagecolor="#ffffff"
++     bordercolor="#e0e0e0"
++     borderopacity="1"
++     gridtolerance="10000"
++     guidetolerance="10"
++     objecttolerance="10"
++     inkscape:pageopacity="0.0"
++     inkscape:pageshadow="2"
++     inkscape:zoom="4"
++     inkscape:cx="20.372005"
++     inkscape:cy="14.768475"
++     inkscape:document-units="px"
++     inkscape:current-layer="layer1"
++     width="48px"
++     height="48px"
++     inkscape:showpageshadow="false"
++     inkscape:window-width="1102"
++     inkscape:window-height="958"
++     inkscape:window-x="2117"
++     inkscape:window-y="82"
++     showgrid="false" />
++  <metadata
++     id="metadata7859">
++    <rdf:RDF>
++      <cc:Work
++         rdf:about="">
++        <dc:format>image/svg+xml</dc:format>
++        <dc:type
++           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
++        <dc:creator>
++          <cc:Agent>
++            <dc:title>Jakub Steiner</dc:title>
++          </cc:Agent>
++        </dc:creator>
++        <dc:source>http://jimmac.musichall.cz</dc:source>
++        <cc:license
++           rdf:resource="http://creativecommons.org/licenses/GPL/2.0/" />
++        <dc:title>Gnome Session Properties</dc:title>
++      </cc:Work>
++      <cc:License
++         rdf:about="http://creativecommons.org/licenses/GPL/2.0/">
++        <cc:permits
++           rdf:resource="http://web.resource.org/cc/Reproduction" />
++        <cc:permits
++           rdf:resource="http://web.resource.org/cc/Distribution" />
++        <cc:requires
++           rdf:resource="http://web.resource.org/cc/Notice" />
++        <cc:permits
++           rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
++        <cc:requires
++           rdf:resource="http://web.resource.org/cc/ShareAlike" />
++        <cc:requires
++           rdf:resource="http://web.resource.org/cc/SourceCode" />
++      </cc:License>
++    </rdf:RDF>
++  </metadata>
++  <g
++     inkscape:label="Layer 1"
++     inkscape:groupmode="layer"
++     id="layer1">
++    <g
++       id="g5672"
++       style="opacity:0.53714286">
++      <rect
++         y="38"
++         x="7.7196383"
++         height="8.5036354"
++         width="32.123024"
++         id="rect4173"
++         style="opacity:1;color:#000000;fill:url(#linearGradient5670);fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1;stroke-linecap:round;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible" />
++      <path
++         sodipodi:nodetypes="cccc"
++         id="path5058"
++         d="M 39.842663,38.000295 C 39.842663,38.000295 39.842663,46.503461 39.842663,46.503461 C 43.268636,46.519469 48.125002,44.598333 48.125,42.25133 C 48.125,39.904328 44.30187,38.000295 39.842663,38.000295 z "
++         style="opacity:1;color:#000000;fill:url(#radialGradient5667);fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1;stroke-linecap:round;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible" />
++      <path
++         style="opacity:1;color:#000000;fill:url(#radialGradient5664);fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1;stroke-linecap:round;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible"
++         d="M 7.7196385,38.000295 C 7.7196385,38.000295 7.7196385,46.503461 7.7196385,46.503461 C 4.2936621,46.519469 -0.56270146,44.598333 -0.56270146,42.25133 C -0.56270146,39.904328 3.2604286,38.000295 7.7196385,38.000295 z "
++         id="path5018"
++         sodipodi:nodetypes="cccc" />
++    </g>
++    <rect
++       style="opacity:1;color:#000000;fill:#729fcf;fill-opacity:1;fill-rule:evenodd;stroke:#3465a4;stroke-width:1;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
++       id="rect4585"
++       width="42.848347"
++       height="39.870949"
++       x="2.6516504"
++       y="3.6290491"
++       rx="2.2839575"
++       ry="2.273742" />
++    <rect
++       ry="2.2922091"
++       rx="2.2922091"
++       y="4.3838844"
++       x="2.5"
++       height="5"
++       width="43"
++       id="rect5606"
++       style="opacity:0.28;color:#000000;fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate;filter:url(#filter5628)" />
++    <rect
++       style="opacity:1;color:#000000;fill:url(#linearGradient5648);fill-opacity:1.0;fill-rule:evenodd;stroke:url(#linearGradient5656);stroke-width:1;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
++       id="rect5556"
++       width="43"
++       height="5"
++       x="2.5"
++       y="3.5"
++       rx="2.2922091"
++       ry="2.2922091" />
++    <rect
++       ry="1.2758038"
++       rx="1.2758038"
++       y="4.6290464"
++       x="3.6516466"
++       height="37.870953"
++       width="40.848354"
++       id="rect5632"
++       style="opacity:0.52571429;color:#000000;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:url(#linearGradient5640);stroke-width:1;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate" />
++    <g
++       id="g5677"
++       transform="translate(43.499997,-2.124989)">
++      <rect
++         id="rect3818"
++         style="color:#000000;fill:url(#linearGradient5682);fill-opacity:1;fill-rule:evenodd;stroke:#8d8d8d;stroke-width:1.00000095;stroke-linecap:butt;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible"
++         y="19.625"
++         x="-37.999996"
++         ry="0.53949153"
++         rx="0.54073501"
++         height="19.999989"
++         width="22.000008" />
++      <rect
++         id="rect3820"
++         style="color:#000000;fill:url(#linearGradient5684);fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible"
++         y="21.125"
++         x="-36.499996"
++         ry="0.095258936"
++         rx="0.10055112"
++         height="3"
++         width="19" />
++      <rect
++         id="rect4962"
++         style="color:#000000;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#ffffff;stroke-width:1.00000143;stroke-linecap:butt;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:0.47878789;visibility:visible;display:inline;overflow:visible"
++         y="20.624994"
++         x="-37"
++         ry="0.16447251"
++         rx="0.188051"
++         height="18.000002"
++         width="20.000011" />
++    </g>
++    <g
++       transform="translate(53.499997,-7.124989)"
++       id="g5686">
++      <rect
++         width="22.000008"
++         height="19.999989"
++         rx="0.54073501"
++         ry="0.53949153"
++         x="-37.999996"
++         y="19.625"
++         style="color:#000000;fill:url(#linearGradient5694);fill-opacity:1;fill-rule:evenodd;stroke:#8d8d8d;stroke-width:1.00000095;stroke-linecap:butt;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible"
++         id="rect5688" />
++      <rect
++         width="19"
++         height="3"
++         rx="0.10055112"
++         ry="0.095258936"
++         x="-36.499996"
++         y="21.125"
++         style="color:#000000;fill:url(#linearGradient5696);fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible"
++         id="rect5690" />
++      <rect
++         width="20.000011"
++         height="18.000002"
++         rx="0.188051"
++         ry="0.16447251"
++         x="-37"
++         y="20.624994"
++         style="color:#000000;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#ffffff;stroke-width:1.00000143;stroke-linecap:butt;stroke-linejoin:miter;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:0.47878789;visibility:visible;display:inline;overflow:visible"
++         id="rect5692" />
++    </g>
++    <g
++       id="g5724"
++       transform="translate(0,8)">
++      <path
++         style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;opacity:0.31428571;filter:url(#filter5786)"
++         d="M 10.5,25.474874 L 20.5,15.474874 L 20.5,21.005204 L 40.5,21.005204 C 44.35508,21.005204 45.58678,20.95144 45.5,23 L 45.5,33 C 45.5,33 43.070425,29.988738 40.625,29.988738 L 20.5,29.988738 L 20.5,35.474874 L 10.5,25.474874 z "
++         id="path5738"
++         sodipodi:nodetypes="cccccccccc" />
++      <path
++         sodipodi:nodetypes="cccccccccc"
++         id="path5698"
++         d="M 10.5,23 L 20.5,13 L 20.5,18.53033 L 40.5,18.53033 C 44.35508,18.53033 45.58678,20.95144 45.5,23 L 45.5,33 C 45.5,33 45.096959,27.513864 40.625,27.513864 L 20.5,27.513864 L 20.5,33 L 10.5,23 z "
++         style="fill:url(#linearGradient5728);fill-opacity:1;fill-rule:evenodd;stroke:#555753;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
++      <path
++         d="M 19.5625,15.25 L 11.8125,23 L 19.5625,30.75 L 19.5625,27.5 C 19.55998,27.250596 19.657943,27.010672 19.834307,26.834307 C 20.010672,26.657943 20.250596,26.55998 20.5,26.5625 L 40.625,26.5625 C 42.489029,26.5625 43.674657,27.497362 44.5625,28.5625 L 44.5625,23 C 44.562325,22.989584 44.562325,22.979166 44.5625,22.96875 C 44.597378,22.145414 44.36819,21.273844 43.78125,20.625 C 43.19431,19.976156 42.233327,19.46875 40.5,19.46875 L 20.5,19.46875 C 20.250596,19.47127 20.010672,19.373307 19.834307,19.196943 C 19.657943,19.020578 19.55998,18.780654 19.5625,18.53125 L 19.5625,15.25 z "
++         inkscape:href="#path5698"
++         id="path5712"
++         style="fill:none;fill-opacity:1;fill-rule:evenodd;stroke:url(#linearGradient5730);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
++         xlink:href="#path5698"
++         inkscape:original="M 20.5 13 L 10.5 23 L 20.5 33 L 20.5 27.5 L 40.625 27.5 C 45.096959 27.5 45.5 33 45.5 33 L 45.5 23 C 45.58678 20.95144 44.35508 18.531249 40.5 18.53125 L 20.5 18.53125 L 20.5 13 z "
++         inkscape:radius="-0.92807764"
++         sodipodi:type="inkscape:offset" />
++    </g>
++    <rect
++       ry="1.1278381"
++       rx="1.1278381"
++       y="4.5"
++       x="3.5"
++       height="3"
++       width="41"
++       id="rect4627"
++       style="opacity:1;color:#000000;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:url(#linearGradient5604);stroke-width:1;stroke-linecap:square;stroke-linejoin:round;marker:none;marker-start:none;marker-mid:none;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;visibility:visible;display:inline;overflow:visible;enable-background:accumulate" />
++  </g>
++</svg>
+diff --git a/data/icons/symbolic/Makefile.am b/data/icons/symbolic/Makefile.am
+new file mode 100644
+index 00000000..670d0a5a
+--- /dev/null
++++ b/data/icons/symbolic/Makefile.am
+@@ -0,0 +1,25 @@
++size = symbolic
++
++themedir = $(datadir)/icons/hicolor
++iconsdir = $(themedir)/$(size)/apps
++
++icons_DATA = session-properties-symbolic.svg
++
++gtk_update_icon_cache = gtk-update-icon-cache -f -t $(datadir)/icons/hicolor
++
++install-data-hook:
++	@-if test -z "$(DESTDIR)"; then \
++		echo "Updating Gtk icon cache."; \
++		$(gtk_update_icon_cache); \
++	else \
++		echo "*** Icon cache not updated. After install, run this:"; \
++		echo "***   $(gtk_update_icon_cache)"; \
++	fi
++
++uninstall-hook:
++	@rm -f  $(DESTDIR)$(themedir)/icon-theme.cache
++
++EXTRA_DIST =		\
++	$(icons_DATA)
++
++-include $(top_srcdir)/git.mk
+diff --git a/data/icons/symbolic/session-properties-symbolic.svg b/data/icons/symbolic/session-properties-symbolic.svg
+new file mode 100644
+index 00000000..e628ecd1
+--- /dev/null
++++ b/data/icons/symbolic/session-properties-symbolic.svg
+@@ -0,0 +1,28 @@
++<?xml version='1.0' encoding='UTF-8' standalone='no'?>
++<!-- Created with Inkscape (http://www.inkscape.org/) -->
++
++<svg xmlns:cc='http://creativecommons.org/ns#' xmlns:dc='http://purl.org/dc/elements/1.1/' sodipodi:docname='gnome-session-properties-symbolic.svg' height='16.000015' id='svg7384' xmlns:inkscape='http://www.inkscape.org/namespaces/inkscape' xmlns:osb='http://www.openswatchbook.org/uri/2009/osb' xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' xmlns:sodipodi='http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd' xmlns:svg='http://www.w3.org/2000/svg' version='1.1' inkscape:version='0.91 r13725' width='16.000013' xmlns='http://www.w3.org/2000/svg'>
++  <metadata id='metadata90'>
++    <rdf:RDF>
++      <cc:Work rdf:about=''>
++        <dc:format>image/svg+xml</dc:format>
++        <dc:type rdf:resource='http://purl.org/dc/dcmitype/StillImage'/>
++        <dc:title>Gnome Symbolic Icon Theme</dc:title>
++      </cc:Work>
++    </rdf:RDF>
++  </metadata>
++  <sodipodi:namedview inkscape:bbox-paths='true' bordercolor='#666666' borderopacity='1' inkscape:current-layer='layer9' inkscape:cx='16.984015' inkscape:cy='3.9235845' gridtolerance='10' inkscape:guide-bbox='true' guidetolerance='10' id='namedview88' inkscape:object-nodes='false' inkscape:object-paths='false' objecttolerance='10' pagecolor='#555753' inkscape:pageopacity='1' inkscape:pageshadow='2' showborder='false' showgrid='false' showguides='true' inkscape:snap-bbox='true' inkscape:snap-bbox-midpoints='false' inkscape:snap-global='true' inkscape:snap-grids='true' inkscape:snap-nodes='true' inkscape:snap-others='false' inkscape:snap-to-guides='true' inkscape:window-height='1376' inkscape:window-maximized='1' inkscape:window-width='2560' inkscape:window-x='0' inkscape:window-y='27' inkscape:zoom='1'>
++    <inkscape:grid empspacing='2' enabled='true' id='grid4866' originx='-22' originy='-341.99999' snapvisiblegridlinesonly='true' spacingx='1px' spacingy='1px' type='xygrid' visible='true'/>
++  </sodipodi:namedview>
++  <title id='title9167'>Gnome Symbolic Icon Theme</title>
++  <defs id='defs7386'>
++    <linearGradient id='linearGradient7212' osb:paint='solid'>
++      <stop id='stop7214' offset='0' style='stop-color:#000000;stop-opacity:1;'/>
++    </linearGradient>
++  </defs>
++  <g inkscape:groupmode='layer' id='layer9' inkscape:label='apps' style='display:inline' transform='translate(-263.0002,125)'>
++    <path inkscape:connector-curvature='0' d='m 264.03145,-125 c -0.56312,0 -1.03125,0.43688 -1.03125,1 l 0,2 16,0 0,-2 c 0,-0.56312 -0.43688,-1 -1,-1 z' id='rect10231' sodipodi:nodetypes='ssccsss' style='color:#000000;clip-rule:nonzero;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:#000000;solid-opacity:1;fill:#bebebe;fill-opacity:0.36470588;fill-rule:nonzero;stroke:none;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;marker:none;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto;enable-background:accumulate'/>
++    <path inkscape:connector-curvature='0' d='m 263.0002,-120.96865 0,10.9061 c 0,0.5631 0.46813,1.0314 1.03125,1.0314 l 13.96875,0 c 0.56312,0 1,-0.4683 1,-1.0314 l 0,-10.9061 z m 6,0.9686 9,0 0,7 -9,0 z m 1,2 0,4 7,0 0,-4 z m -5,1 3,0 0,2 -2,0 0,4 7,0 0,-0.9686 1,0 0,1.9686 -9,0 z' id='rect10231-3' sodipodi:nodetypes='cssssccccccccccccccccccccccc' style='color:#000000;clip-rule:nonzero;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:#000000;solid-opacity:1;fill:#bebebe;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;marker:none;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto;enable-background:accumulate'/>
++    
++  </g>
++</svg>
+diff --git a/data/session-properties.ui b/data/session-properties.ui
+new file mode 100644
+index 00000000..1f0cb9a5
+--- /dev/null
++++ b/data/session-properties.ui
+@@ -0,0 +1,323 @@
++<?xml version="1.0"?>
++<interface>
++  <requires lib="gtk+" version="2.16"/>
++  <!-- interface-naming-policy toplevel-contextual -->
++  <object class="GtkNotebook" id="main-notebook">
++    <property name="visible">True</property>
++    <property name="can_focus">True</property>
++    <property name="border_width">6</property>
++    <child>
++      <object class="GtkVBox" id="vbox1">
++        <property name="visible">True</property>
++        <property name="border_width">12</property>
++        <property name="orientation">vertical</property>
++        <property name="spacing">3</property>
++        <child>
++          <object class="GtkLabel" id="label6">
++            <property name="visible">True</property>
++            <property name="xalign">0</property>
++            <property name="xpad">3</property>
++            <property name="ypad">3</property>
++            <property name="label" translatable="yes">Additional startup _programs:</property>
++            <property name="use_underline">True</property>
++            <property name="mnemonic_widget">session_properties_treeview</property>
++          </object>
++          <packing>
++            <property name="expand">False</property>
++            <property name="position">0</property>
++          </packing>
++        </child>
++        <child>
++          <object class="GtkHBox" id="hbox1">
++            <property name="visible">True</property>
++            <property name="spacing">6</property>
++            <child>
++              <object class="GtkScrolledWindow" id="scrolledwindow1">
++                <property name="visible">True</property>
++                <property name="can_focus">True</property>
++                <property name="hscrollbar_policy">never</property>
++                <property name="vscrollbar_policy">automatic</property>
++                <property name="shadow_type">etched-in</property>
++                <child>
++                  <object class="GtkTreeView" id="session_properties_treeview">
++                    <property name="height_request">210</property>
++                    <property name="visible">True</property>
++                    <property name="can_focus">True</property>
++                  </object>
++                </child>
++              </object>
++              <packing>
++                <property name="position">0</property>
++              </packing>
++            </child>
++            <child>
++              <object class="GtkVButtonBox" id="vbuttonbox1">
++                <property name="visible">True</property>
++                <property name="spacing">6</property>
++                <property name="layout_style">start</property>
++                <child>
++                  <object class="GtkButton" id="session_properties_add_button">
++                    <property name="label">gtk-add</property>
++                    <property name="visible">True</property>
++                    <property name="can_focus">True</property>
++                    <property name="receives_default">True</property>
++                    <property name="use_stock">True</property>
++                  </object>
++                  <packing>
++                    <property name="expand">False</property>
++                    <property name="fill">False</property>
++                    <property name="position">0</property>
++                  </packing>
++                </child>
++                <child>
++                  <object class="GtkButton" id="session_properties_delete_button">
++                    <property name="label">gtk-remove</property>
++                    <property name="visible">True</property>
++                    <property name="sensitive">False</property>
++                    <property name="can_focus">True</property>
++                    <property name="receives_default">True</property>
++                    <property name="use_stock">True</property>
++                  </object>
++                  <packing>
++                    <property name="expand">False</property>
++                    <property name="fill">False</property>
++                    <property name="position">1</property>
++                  </packing>
++                </child>
++                <child>
++                  <object class="GtkButton" id="session_properties_edit_button">
++                    <property name="label">gtk-edit</property>
++                    <property name="visible">True</property>
++                    <property name="sensitive">False</property>
++                    <property name="can_focus">True</property>
++                    <property name="receives_default">True</property>
++                    <property name="use_stock">True</property>
++                  </object>
++                  <packing>
++                    <property name="expand">False</property>
++                    <property name="fill">False</property>
++                    <property name="position">2</property>
++                  </packing>
++                </child>
++              </object>
++              <packing>
++                <property name="expand">False</property>
++                <property name="fill">False</property>
++                <property name="position">1</property>
++              </packing>
++            </child>
++          </object>
++          <packing>
++            <property name="position">1</property>
++          </packing>
++        </child>
++      </object>
++    </child>
++    <child type="tab">
++      <object class="GtkLabel" id="label4">
++        <property name="visible">True</property>
++        <property name="label" translatable="yes">Startup Programs</property>
++      </object>
++      <packing>
++        <property name="tab_fill">False</property>
++      </packing>
++    </child>
++    <child>
++      <object class="GtkVBox" id="vbox3">
++        <property name="visible">True</property>
++        <property name="border_width">12</property>
++        <property name="orientation">vertical</property>
++        <property name="spacing">6</property>
++        <child>
++          <object class="GtkCheckButton" id="session_properties_remember_toggle">
++            <property name="label" translatable="yes">_Automatically remember running applications when logging out</property>
++            <property name="visible">True</property>
++            <property name="can_focus">True</property>
++            <property name="receives_default">False</property>
++            <property name="use_underline">True</property>
++            <property name="draw_indicator">True</property>
++          </object>
++          <packing>
++            <property name="expand">False</property>
++            <property name="fill">False</property>
++            <property name="position">0</property>
++          </packing>
++        </child>
++        <child>
++          <object class="GtkHButtonBox" id="hbuttonbox1">
++            <property name="visible">True</property>
++            <child>
++              <object class="GtkButton" id="session_properties_save_button">
++                <property name="can_focus">True</property>
++                <property name="receives_default">True</property>
++                <child>
++                  <object class="GtkHBox" id="hbox2">
++                    <property name="visible">True</property>
++                    <property name="spacing">4</property>
++                    <child>
++                      <object class="GtkImage" id="image1">
++                        <property name="visible">True</property>
++                        <property name="stock">gtk-save</property>
++                      </object>
++                      <packing>
++                        <property name="expand">False</property>
++                        <property name="fill">False</property>
++                        <property name="position">0</property>
++                      </packing>
++                    </child>
++                    <child>
++                      <object class="GtkLabel" id="label7">
++                        <property name="visible">True</property>
++                        <property name="label" translatable="yes">_Remember Currently Running Applications</property>
++                        <property name="use_underline">True</property>
++                      </object>
++                      <packing>
++                        <property name="position">1</property>
++                      </packing>
++                    </child>
++                  </object>
++                </child>
++              </object>
++              <packing>
++                <property name="expand">False</property>
++                <property name="fill">False</property>
++                <property name="position">0</property>
++              </packing>
++            </child>
++          </object>
++          <packing>
++            <property name="expand">False</property>
++            <property name="fill">False</property>
++            <property name="position">1</property>
++          </packing>
++        </child>
++      </object>
++      <packing>
++        <property name="position">1</property>
++      </packing>
++    </child>
++    <child type="tab">
++      <object class="GtkLabel" id="label5">
++        <property name="visible">True</property>
++        <property name="label" translatable="yes">Options</property>
++      </object>
++      <packing>
++        <property name="position">1</property>
++        <property name="tab_fill">False</property>
++      </packing>
++    </child>
++  </object>
++  <object class="GtkTable" id="main-table">
++    <property name="visible">True</property>
++    <property name="border_width">6</property>
++    <property name="n_rows">3</property>
++    <property name="n_columns">2</property>
++    <property name="column_spacing">12</property>
++    <property name="row_spacing">6</property>
++    <child>
++      <object class="GtkHBox" id="hbox3">
++        <property name="visible">True</property>
++        <property name="spacing">12</property>
++        <child>
++          <object class="GtkEntry" id="session_properties_command_entry">
++            <property name="visible">True</property>
++            <property name="can_focus">True</property>
++            <property name="invisible_char">&#x25CF;</property>
++          </object>
++          <packing>
++            <property name="position">0</property>
++          </packing>
++        </child>
++        <child>
++          <object class="GtkButton" id="session_properties_browse_button">
++            <property name="label" translatable="yes">Browse…</property>
++            <property name="visible">True</property>
++            <property name="can_focus">True</property>
++            <property name="receives_default">True</property>
++          </object>
++          <packing>
++            <property name="expand">False</property>
++            <property name="fill">False</property>
++            <property name="position">1</property>
++          </packing>
++        </child>
++      </object>
++      <packing>
++        <property name="left_attach">1</property>
++        <property name="right_attach">2</property>
++        <property name="top_attach">1</property>
++        <property name="bottom_attach">2</property>
++        <property name="y_options">GTK_FILL</property>
++      </packing>
++    </child>
++    <child>
++      <object class="GtkEntry" id="session_properties_comment_entry">
++        <property name="visible">True</property>
++        <property name="can_focus">True</property>
++        <property name="invisible_char">&#x25CF;</property>
++      </object>
++      <packing>
++        <property name="left_attach">1</property>
++        <property name="right_attach">2</property>
++        <property name="top_attach">2</property>
++        <property name="bottom_attach">3</property>
++        <property name="y_options">GTK_FILL</property>
++      </packing>
++    </child>
++    <child>
++      <object class="GtkEntry" id="session_properties_name_entry">
++        <property name="visible">True</property>
++        <property name="can_focus">True</property>
++        <property name="invisible_char">&#x25CF;</property>
++      </object>
++      <packing>
++        <property name="left_attach">1</property>
++        <property name="right_attach">2</property>
++        <property name="y_options">GTK_FILL</property>
++      </packing>
++    </child>
++    <child>
++      <object class="GtkLabel" id="label3">
++        <property name="visible">True</property>
++        <property name="xalign">0</property>
++        <property name="label" translatable="yes">Comm_ent:</property>
++        <property name="use_underline">True</property>
++        <property name="mnemonic_widget">label2</property>
++      </object>
++      <packing>
++        <property name="top_attach">2</property>
++        <property name="bottom_attach">3</property>
++        <property name="x_options">GTK_FILL</property>
++        <property name="y_options">GTK_FILL</property>
++      </packing>
++    </child>
++    <child>
++      <object class="GtkLabel" id="label2">
++        <property name="visible">True</property>
++        <property name="xalign">0</property>
++        <property name="label" translatable="yes">Co_mmand:</property>
++        <property name="use_underline">True</property>
++        <property name="mnemonic_widget">session_properties_command_entry</property>
++      </object>
++      <packing>
++        <property name="top_attach">1</property>
++        <property name="bottom_attach">2</property>
++        <property name="x_options">GTK_FILL</property>
++        <property name="y_options">GTK_FILL</property>
++      </packing>
++    </child>
++    <child>
++      <object class="GtkLabel" id="label1">
++        <property name="visible">True</property>
++        <property name="xalign">0</property>
++        <property name="label" translatable="yes">_Name:</property>
++        <property name="use_underline">True</property>
++        <property name="mnemonic_widget">session_properties_name_entry</property>
++      </object>
++      <packing>
++        <property name="x_options">GTK_FILL</property>
++        <property name="y_options">GTK_FILL</property>
++      </packing>
++    </child>
++  </object>
++</interface>
+diff --git a/doc/man/gnome-session.1 b/doc/man/gnome-session.1
+index bf9cf808..35c062c5 100644
+--- a/doc/man/gnome-session.1
++++ b/doc/man/gnome-session.1
+@@ -67,46 +67,48 @@ Name=GNOME
+ RequiredComponents=gnome-shell;gnome-settings-daemon;
+ .in
+ .fi
+ .PP
+ The \fB.session\fP files are looked for in
+ \fB$XDG_CONFIG_HOME/gnome-session/sessions\fP,
+ \fB$XDG_CONFIG_DIRS/gnome-session/sessions\fP and
+ \fB$XDG_DATA_DIRS/gnome-session/sessions\fP.
+ .SH ENVIRONMENT
+ \fIgnome-session\fP sets several environment variables for the use of
+ its child processes:
+ .PP
+ .B SESSION_MANAGER
+ .IP
+ This variable is used by session-manager aware clients to contact
+ gnome-session.
+ .PP
+ .B DISPLAY
+ .IP
+ This variable is set to the X display being used by
+ \fIgnome-session\fP. Note that if the \fI--display\fP option is used
+ this might be different from the setting of the environment variable
+ when gnome-session is invoked.
+ .SH FILES
+ .PP
+ .B $XDG_CONFIG_HOME/config/autostart
+ .B $XDG_CONFIG_DIRS/config/autostart
+ .B /usr/share/gnome/autostart
+ .IP
+ The applications defined in those directories will be started on login.
++\fIgnome-session-properties(1)\fP can be used to easily configure them.
+ .PP
+ .B $XDG_CONFIG_HOME/gnome-session/sessions
+ .B $XDG_CONFIG_DIRS/gnome-session/sessions
+ .B $XDG_DATA_DIRS/gnome-session/sessions
+ .IP
+ These directories contain the \fB.session\fP files that can be used
+ with the \fI--session\fP option.
+ .PP
+ .B $XDG_CONFIG_HOME/gnome-session/saved-session
+ .IP
+ This directory contains the list of applications of the saved session.
+ .SH BUGS
+ If you find bugs in the \fIgnome-session\fP program, please report
+ these on https://bugzilla.gnome.org.
+ .SH SEE ALSO
++.BR gnome-session-properties(1)
+ .BR gnome-session-quit(1)
+diff --git a/po/POTFILES.in b/po/POTFILES.in
+index cc1170aa..76882645 100644
+--- a/po/POTFILES.in
++++ b/po/POTFILES.in
+@@ -1,18 +1,19 @@
+ # List of source files containing translatable strings.
+ # Please keep this file sorted alphabetically.
+ data/gnome-custom-session.desktop.in
+ data/gnome.desktop.in
+ data/gnome-xorg.desktop.in
+ data/gnome-dummy.session.desktop.in.in
+ data/gnome.session.desktop.in.in
+ [type: gettext/glade]data/session-selector.ui
++[type: gettext/glade]data/session-properties.ui
+ gnome-session/gsm-fail-whale-dialog.c
+ gnome-session/gsm-manager.c
+ gnome-session/gsm-process-helper.c
+ gnome-session/gsm-util.c
+ gnome-session/gsm-xsmp-client.c
+ gnome-session/gsm-xsmp-server.c
+ gnome-session/main.c
+ tools/gnome-session-inhibit.c
+ tools/gnome-session-selector.c
+ tools/gnome-session-quit.c
+-- 
+2.12.0
+

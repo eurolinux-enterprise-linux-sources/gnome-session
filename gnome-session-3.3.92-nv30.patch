@@ -1,0 +1,52 @@
+From b524466482c9c64c11a55fb5d0174080471a1d5a Mon Sep 17 00:00:00 2001
+From: Adam Williamson <awilliam@redhat.com>
+Date: Fri, 8 May 2015 16:41:38 -0400
+Subject: [PATCH] blacklist NV30 adapter on nouveau until #745202 is fixed
+
+---
+ data/hardware-compatibility | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/data/hardware-compatibility b/data/hardware-compatibility
+index 48b7946..3daef68 100644
+--- a/data/hardware-compatibility
++++ b/data/hardware-compatibility
+@@ -1,32 +1,35 @@
+ ##
+ ## This file contains a list of blacklist/whitelist regular expressions for
+ ## renderer strings.
+ ##
+ ## The regular expressions are case-insensitive POSIX Extended Regular
+ ## Expressions. See regex(7) for details.
+ ##
+ ## Syntax:
+ ##  - Comment lines start with '#'
+ ##  - Lines starting with '+' are whitelisting.
+ ##  - Lines starting with '-' are blacklisting.
+ ##  - Lines not starting with '#', '+', '-' are ignored.
+ ##
+ 
+ # Intel 830-865
+ -Intel\(R\) 8[[:digit:]]{2,2}[^[:digit:]]
+ 
+ # Intel IGD 
+ -Intel IGD
+ 
+ # Pre-R300 radeon
+ -Mesa DRI R[12]00[^[:digit:]]
+ -Mesa DRI R[12]00$
+ 
++# NV30 family on Nouveau: https://bugzilla.redhat.com/show_bug.cgi?id=745202
++-Gallium .* on NV3[0-9A-F]$
++
+ # Old Mesa software GL renderer
+ -software rasterizer
+ 
+ # Gallium has softpipe; we explicitly enable llvmpipe
+ -softpipe
+ 
+ # nouveau vieux NV25 doesn't work too well
+ -Mesa DRI nv25
+-- 
+2.3.7
+

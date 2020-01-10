@@ -1,0 +1,604 @@
+From a5a64308ef552d7a1ef4210db9d848c9fd7b3740 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Tue, 7 Jan 2014 21:02:02 -0500
+Subject: [PATCH 16/19] session-selector: add toggle for classic/normal
+ selection
+
+Since we offer both classic mode and regular mode when
+not using the session selector, we should also offer it
+when using the session selector.
+---
+ data/session-selector.ui       |  39 ++++++++++++++-
+ tools/gnome-session-selector.c | 106 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 143 insertions(+), 2 deletions(-)
+
+diff --git a/data/session-selector.ui b/data/session-selector.ui
+index 4d1e3009..beab73a1 100644
+--- a/data/session-selector.ui
++++ b/data/session-selector.ui
+@@ -153,71 +153,106 @@
+                                 <property name="fill">False</property>
+                                 <property name="position">2</property>
+                               </packing>
+                             </child>
+                           </object>
+                           <packing>
+                             <property name="expand">False</property>
+                             <property name="fill">True</property>
+                             <property name="position">1</property>
+                           </packing>
+                         </child>
+                       </object>
+                       <packing>
+                         <property name="expand">True</property>
+                         <property name="fill">True</property>
+                         <property name="position">1</property>
+                       </packing>
+                     </child>
+                   </object>
+                   <packing>
+                     <property name="expand">True</property>
+                     <property name="fill">True</property>
+                     <property name="position">1</property>
+                   </packing>
+                 </child>
+                 <child>
+                   <object class="GtkHButtonBox" id="hbuttonbox2">
+                     <property name="visible">True</property>
+                     <property name="can_focus">False</property>
+                     <property name="spacing">6</property>
+-                    <property name="layout_style">end</property>
++                    <child>
++                      <object class="GtkBox" id="box1">
++                        <property name="visible">True</property>
++                        <property name="can_focus">False</property>
++                        <property name="spacing">6</property>
++                        <child>
++                          <object class="GtkLabel" id="classic-mode-label">
++                            <property name="visible">True</property>
++                            <property name="can_focus">False</property>
++                            <property name="label" translatable="yes">Classic Experience</property>
++                          </object>
++                          <packing>
++                            <property name="expand">False</property>
++                            <property name="fill">True</property>
++                            <property name="position">0</property>
++                          </packing>
++                        </child>
++                        <child>
++                          <object class="GtkSwitch" id="classic-mode-switch">
++                            <property name="visible">True</property>
++                            <property name="can_focus">True</property>
++                          </object>
++                          <packing>
++                            <property name="expand">False</property>
++                            <property name="fill">True</property>
++                            <property name="position">1</property>
++                          </packing>
++                        </child>
++                      </object>
++                      <packing>
++                        <property name="expand">False</property>
++                        <property name="fill">True</property>
++                        <property name="position">0</property>
++                      </packing>
++                    </child>
+                     <child>
+                       <object class="GtkButton" id="continue-button">
+                         <property name="label" translatable="yes">_Continue</property>
+                         <property name="visible">True</property>
+                         <property name="can_focus">True</property>
+                         <property name="can_default">True</property>
+                         <property name="has_default">True</property>
+                         <property name="receives_default">True</property>
+                         <property name="use_underline">True</property>
+                       </object>
+                       <packing>
+                         <property name="expand">False</property>
+                         <property name="fill">False</property>
+-                        <property name="position">0</property>
++                        <property name="position">1</property>
++                        <property name="non_homogeneous">True</property>
+                       </packing>
+                     </child>
+                   </object>
+                   <packing>
+                     <property name="expand">False</property>
+                     <property name="fill">True</property>
+                     <property name="position">2</property>
+                   </packing>
+                 </child>
+               </object>
+             </child>
+           </object>
+         </child>
+       </object>
+     </child>
+   </object>
+   <object class="GtkListStore" id="session-store">
+     <columns>
+       <!-- column-name name -->
+       <column type="gchararray"/>
+     </columns>
+   </object>
+   <object class="GtkTreeModelSort" id="sort-model">
+     <property name="model">session-store</property>
+   </object>
+ </interface>
+diff --git a/tools/gnome-session-selector.c b/tools/gnome-session-selector.c
+index 8f37eca4..f7f12e7b 100644
+--- a/tools/gnome-session-selector.c
++++ b/tools/gnome-session-selector.c
+@@ -16,60 +16,61 @@
+  * along with this program; if not, see <http://www.gnu.org/licenses/>.
+  *
+  * Written by: Matthias Clasen <mclasen@redhat.com>
+  */
+ 
+ #include "config.h"
+ 
+ #include <fcntl.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <unistd.h>
+ 
+ #include <glib.h>
+ #include <gtk/gtk.h>
+ #include <gio/gio.h>
+ 
+ #include <glib/gi18n.h>
+ #include <glib/gstdio.h>
+ 
+ #include <dbus/dbus-glib.h>
+ #include <dbus/dbus-glib-lowlevel.h>
+ 
+ #define GSM_SERVICE_DBUS   "org.gnome.SessionManager"
+ #define GSM_PATH_DBUS      "/org/gnome/SessionManager"
+ #define GSM_INTERFACE_DBUS "org.gnome.SessionManager"
+ 
+ #define GSM_MANAGER_SCHEMA        "org.gnome.SessionManager"
+ #define KEY_AUTOSAVE_ONE_SHOT     "auto-save-session-one-shot"
++#define DEFAULT_SESSION_NAME      "gnome"
+ 
+ static GtkBuilder *builder;
+ static GtkWidget *session_list;
+ static GtkListStore *store;
+ static GtkTreeModelSort *sort_model;
+ static char *info_text;
+ 
+ static void select_session (const char *name);
+ static gboolean make_session_current (const char *name);
+ 
+ static char *
+ get_session_path (const char *name)
+ {
+         return g_build_filename (g_get_user_config_dir (), "gnome-session", name, NULL);
+ }
+ 
+ static char *
+ find_new_session_name (void)
+ {
+         char *name;
+         char *path;
+         int i;
+ 
+         for (i = 1; i < 20; i++) {
+                 name = g_strdup_printf (_("Session %d"), i);
+                 path = get_session_path (name);
+                 if (!g_file_test (path, G_FILE_TEST_EXISTS)) {
+                         g_free (path);
+                         return name;
+                 }
+@@ -125,104 +126,126 @@ is_valid_session_name (const char *name)
+         gtk_tree_model_get_iter_first (GTK_TREE_MODEL (store), &iter);
+         do {
+                 gtk_tree_model_get (GTK_TREE_MODEL (store), &iter, 0, &n, -1);
+                 if (strcmp (n, name) == 0) {
+                         char *message;
+                         message = g_strdup_printf (_("A session named ‘%s’ already exists"), name);
+                         warning_text = g_strdup_printf ("%s\n<small><b>Note:</b> <i>%s</i></small>", info_text, message);
+                         g_free (message);
+                         g_free (n);
+                         break;
+                 }
+                 g_free (n);
+         } while (gtk_tree_model_iter_next (GTK_TREE_MODEL (store), &iter));
+ 
+         info_bar = (GtkWidget *) gtk_builder_get_object (builder, "info-bar");
+         label = (GtkWidget*) gtk_builder_get_object (builder, "info-label");
+ 
+         if (warning_text != NULL) {
+             gtk_info_bar_set_message_type (GTK_INFO_BAR (info_bar), GTK_MESSAGE_WARNING);
+             gtk_label_set_markup (GTK_LABEL (label), warning_text);
+             g_free (warning_text);
+             return FALSE;
+         }
+ 
+         gtk_info_bar_set_message_type (GTK_INFO_BAR (info_bar), GTK_MESSAGE_OTHER);
+         gtk_label_set_markup (GTK_LABEL (label), info_text);
+ 
+         return TRUE;
+ }
+ 
++static char *
++get_session_type_from_file (const char *name)
++{
++        char *file;
++        char *type;
++        gboolean loaded;
++
++        file = g_build_filename (g_get_user_config_dir (), "gnome-session", name, "type", NULL);
++        loaded = g_file_get_contents (file, &type, NULL, NULL);
++        g_free (file);
++
++        if (!loaded)
++                return g_strdup (DEFAULT_SESSION_NAME);
++
++        return type;
++}
++
+ static void
+ populate_session_list (GtkWidget *session_list)
+ {
+         GtkTreeIter iter;
+         char *path;
+         const char *name;
+         GDir *dir;
+         GError *error;
+         char *saved_session;
+         char *default_session;
+         char *default_name;
+         char last_session[PATH_MAX] = "";
+ 
+         saved_session = get_session_path ("saved-session");
+ 
+         if (!g_file_test (saved_session, G_FILE_TEST_IS_SYMLINK)) {
+                 default_name = find_new_session_name ();
+                 default_session = get_session_path (default_name);
+                 rename (saved_session, default_session);
+                 if (symlink (default_name, saved_session) < 0)
+                         g_warning ("Failed to convert saved-session to symlink");
+                 g_free (default_name);
+                 g_free (default_session);
+         }
+ 
+         path = g_build_filename (g_get_user_config_dir (), "gnome-session", NULL);
+         error = NULL;
+         dir = g_dir_open (path, 0, &error);
+         if (dir == NULL) {
+                 g_warning ("Failed to open %s: %s", path, error->message);
+                 g_error_free (error);
+                 goto out;
+         }
+ 
+         default_name = NULL;
+         if (readlink (saved_session, last_session, PATH_MAX - 1) > 0) {
+                 default_name = g_path_get_basename (last_session);
+         }
+ 
+         while ((name = g_dir_read_name (dir)) != NULL) {
++                char *session_type;
++
+                 if (strcmp (name, "saved-session") == 0)
+                         continue;
+ 
++                session_type = get_session_type_from_file (name);
++
+                 gtk_list_store_insert_with_values (store, &iter, 100, 0, name, -1);
++                g_free (session_type);
+ 
+                 if (g_strcmp0 (default_name, name) == 0) {
+                         GtkTreeSelection *selection;
+                         GtkTreeIter child_iter;
+ 
+                         gtk_tree_model_sort_convert_child_iter_to_iter (GTK_TREE_MODEL_SORT (sort_model), &child_iter, &iter);
+                         selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (session_list));
+                         gtk_tree_selection_select_iter (selection, &child_iter);
+                 }
+         }
+ 
+         g_free (default_name);
+         g_dir_close (dir);
+ 
+  out:
+         g_free (saved_session);
+         g_free (path);
+ }
+ 
+ static char *
+ get_last_session (void)
+ {
+         char *saved_session;
+         char last_session[PATH_MAX] = "";
+         char *name = NULL;
+ 
+         saved_session = get_session_path ("saved-session");
+ 
+         if (readlink (saved_session, last_session, PATH_MAX - 1) > 0) {
+                 name = g_path_get_basename (last_session);
+@@ -260,60 +283,136 @@ remove_session (const char *name)
+         GError *error;
+ 
+         path1 = get_session_path ("saved-session");
+         path2 = get_session_path (name);
+ 
+         error = NULL;
+         n = g_file_read_link (path1, &error);
+         if (n == NULL) {
+                 g_warning ("Failed to read link: %s", error->message);
+                 g_error_free (error);
+         }
+         else if (strcmp (n, name) == 0) {
+                 unlink (path1);
+         }
+         g_free (n);
+ 
+         dir = g_dir_open (path2, 0, NULL);
+         while ((d = g_dir_read_name (dir)) != NULL) {
+                 path = g_build_filename (path2, d, NULL);
+                 unlink (path);
+                 g_free (path);
+         }
+         g_dir_close (dir);
+ 
+         remove (path2);
+ 
+         g_free (path1);
+         g_free (path2);
+ }
+ 
++static const char *
++get_session_type_from_switch (void)
++{
++        GtkWidget *mode_switch;
++        gboolean is_classic_mode;
++
++        mode_switch = (GtkWidget *)gtk_builder_get_object (builder, "classic-mode-switch");
++
++        is_classic_mode = gtk_switch_get_active (GTK_SWITCH (mode_switch));
++
++        if (is_classic_mode) {
++                return "gnome-classic";
++        } else {
++                return "gnome";
++        }
++}
++
++static void
++set_mode_switch_from_session_type_file (const char *name)
++{
++        GtkWidget *mode_switch;
++        gboolean is_classic_mode = FALSE;
++        char *type;
++
++        mode_switch = (GtkWidget *)gtk_builder_get_object (builder, "classic-mode-switch");
++
++        type = get_session_type_from_file (name);
++        is_classic_mode = strcmp (type, "gnome-classic") == 0;
++        g_free (type);
++
++        gtk_switch_set_active (GTK_SWITCH (mode_switch), is_classic_mode);
++}
++
++static void
++save_session_type (const char *save_dir,
++                   const char *type)
++{
++        char *file;
++        GError *error;
++
++        file = g_build_filename (save_dir, "type", NULL);
++
++        error = NULL;
++        g_file_set_contents (file, type, strlen (type), &error);
++        if (error != NULL)
++                g_warning ("couldn't save session type to %s: %s",
++                           type, error->message);
++
++        g_free (file);
++}
++
++static void
++save_session_type_from_switch (void)
++{
++        char *name, *path;
++        const char *session_type;
++
++        name = get_selected_session ();
++
++        if (name == NULL) {
++                return;
++        }
++
++        path = get_session_path (name);
++        g_free (name);
++
++        session_type = get_session_type_from_switch ();
++        save_session_type (path, session_type);
++}
++
++static void
++on_mode_switched (GtkSwitch *mode_switch)
++{
++        save_session_type_from_switch ();
++}
++
+ static gboolean
+ make_session_current (const char *name)
+ {
+         char *path1;
+         gboolean ret = TRUE;
+ 
+         path1 = g_build_filename (g_get_user_config_dir (), "gnome-session", "saved-session", NULL);
+ 
+         unlink (path1);
+         if (symlink (name, path1) < 0) {
+                 g_warning ("Failed to make session '%s' current", name);
+                 ret = FALSE;
+         }
+ 
+         g_free (path1);
+ 
+         return ret;
+ }
+ 
+ static void
+ on_remove_session_clicked (GtkButton *button,
+                            gpointer   data)
+ {
+         GtkTreeSelection *selection;
+         GtkTreeModel *model;
+         GtkTreeIter iter;
+         char *name;
+ 
+         selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (session_list));
+         if (gtk_tree_selection_get_selected (selection, &model, &iter)) {
+@@ -492,60 +591,62 @@ static void
+ create_session_and_begin_rename (void)
+ {
+         gchar *name;
+ 
+         name = find_new_session_name ();
+         create_session (name);
+         select_session (name);
+ 
+         begin_rename ();
+ }
+ 
+ static void
+ on_new_session_clicked (GtkButton *button,
+                         gpointer   data)
+ {
+ 	create_session_and_begin_rename ();
+ }
+ 
+ static void
+ on_selection_changed (GtkTreeSelection *selection,
+                       gpointer          data)
+ {
+         char *name;
+ 
+         name = get_selected_session ();
+ 
+         if (name == NULL) {
+                 return;
+         }
+ 
++        set_mode_switch_from_session_type_file (name);
++
+         g_free (name);
+ }
+ 
+ static void
+ update_remove_button (void)
+ {
+         GtkWidget *button;
+ 
+         button = (GtkWidget *)gtk_builder_get_object (builder, "remove-session");
+         if (gtk_tree_model_iter_n_children (GTK_TREE_MODEL (store), NULL) > 1) {
+                 gtk_widget_set_sensitive (button, TRUE);
+         } else {
+                 gtk_widget_set_sensitive (button, FALSE);
+         }
+ }
+ 
+ static void
+ on_row_edited (GtkCellRendererText *cell,
+                const char          *path_string,
+                const char          *new_name,
+                gpointer             data)
+ {
+         GtkTreePath *path;
+         GtkTreeIter  sort_iter, items_iter;
+         char        *old_name;
+         gboolean     was_renamed;
+ 
+         path = gtk_tree_path_new_from_string (path_string);
+         gtk_tree_model_get_iter (GTK_TREE_MODEL (sort_model), &sort_iter, path);
+ 
+@@ -751,75 +852,80 @@ main (int argc, char *argv[])
+         gtk_tree_sortable_set_sort_column_id (GTK_TREE_SORTABLE (sort_model),
+                                               0, GTK_SORT_ASCENDING);
+         g_signal_connect (store, "row-deleted", G_CALLBACK (on_row_deleted), NULL);
+         g_signal_connect (store, "row-inserted", G_CALLBACK (on_row_inserted), NULL);
+         session_list = (GtkWidget *) gtk_builder_get_object (builder, "session-list");
+ 
+         selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (session_list));
+         gtk_tree_selection_set_mode (selection, GTK_SELECTION_SINGLE);
+ 
+         populate_session_list (session_list);
+ 
+         cell = gtk_cell_renderer_text_new ();
+         g_signal_connect (cell, "edited", G_CALLBACK (on_row_edited), NULL);
+ 
+         column = gtk_tree_view_column_new_with_attributes ("", cell, "text", 0, NULL);
+         gtk_tree_view_append_column (GTK_TREE_VIEW (session_list), GTK_TREE_VIEW_COLUMN (column));
+ 
+         g_signal_connect (session_list, "row-activated", G_CALLBACK (on_row_activated), NULL);
+ 
+         g_signal_connect (selection, "changed",
+                           G_CALLBACK (on_selection_changed), NULL);
+ 
+         widget = (GtkWidget *) gtk_builder_get_object (builder, "new-session");
+         g_signal_connect (widget, "clicked", G_CALLBACK (on_new_session_clicked), NULL);
+         widget = (GtkWidget *) gtk_builder_get_object (builder, "remove-session");
+         g_signal_connect (widget, "clicked", G_CALLBACK (on_remove_session_clicked), NULL);
+         widget = (GtkWidget *) gtk_builder_get_object (builder, "rename-session");
+         g_signal_connect (widget, "clicked", G_CALLBACK (on_rename_session_clicked), NULL);
+         widget = (GtkWidget *) gtk_builder_get_object (builder, "continue-button");
+         g_signal_connect (widget, "clicked", G_CALLBACK (on_continue_clicked), NULL);
++        widget = (GtkWidget *) gtk_builder_get_object (builder, "classic-mode-switch");
++        g_signal_connect (widget, "notify::active", G_CALLBACK (on_mode_switched), NULL);
+ 
+         g_signal_connect (window, "map", G_CALLBACK (on_map), NULL);
+         gtk_widget_show (window);
+ 
+         if (g_strcmp0 (action, "load") == 0) {
+             info_text = _("Please select a custom session to run");
+         } else if (g_strcmp0 (action, "print") == 0) {
+             info_text = _("Please select a session to use");
+         } else if (g_strcmp0 (action, "save") == 0) {
+             info_text = _("Please select a session to save to");
+         }
+ 
+         label = (GtkWidget*) gtk_builder_get_object (builder, "info-label");
+         gtk_label_set_markup (GTK_LABEL (label), info_text);
+ 
+         selected_session = get_selected_session ();
+ 
+         if (selected_session == NULL) {
+ 		create_session_and_begin_rename ();
+ 	} else {
++                set_mode_switch_from_session_type_file (selected_session);
+ 		g_free (selected_session);
+         }
+ 
+         gtk_main ();
+ 
+         selected_session = get_selected_session ();
+ 
+         if (g_strcmp0 (action, "load") == 0) {
+                 make_session_current (selected_session);
++                save_session_type_from_switch ();
+                 auto_save_next_session_if_needed ();
+         } else if (g_strcmp0 (action, "save") == 0) {
+                 char *last_session;
+ 
+                 last_session = get_last_session ();
+                 make_session_current (selected_session);
+                 save_session ();
++                save_session_type_from_switch ();
+                 if (last_session != NULL)
+                     make_session_current (last_session);
+         } else if (g_strcmp0 (action, "print") == 0) {
+                 g_print ("%s\n", selected_session);
+         }
+         g_free (selected_session);
+ 
+         return 0;
+ }
+-- 
+2.12.0
+

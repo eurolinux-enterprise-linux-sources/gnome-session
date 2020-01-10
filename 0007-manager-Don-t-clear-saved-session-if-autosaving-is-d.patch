@@ -1,0 +1,81 @@
+From b8e1b19177e1bbe866ed5561880eaaa7852d31dd Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Fri, 20 Dec 2013 16:14:16 -0500
+Subject: [PATCH 07/19] manager: Don't clear saved session if autosaving is
+ disabled
+
+Now that we support on-demand saving again, we need to make sure
+we don't wipe that away at log out.
+---
+ gnome-session/gsm-manager.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
+index 012f3d3f..ce2ffbcf 100644
+--- a/gnome-session/gsm-manager.c
++++ b/gnome-session/gsm-manager.c
+@@ -1790,61 +1790,60 @@ on_xsmp_client_register_confirmed (GsmXSMPClient *client,
+         app = find_app_for_startup_id (manager, id);
+ 
+         if (app != NULL) {
+                 gsm_app_set_registered (app, TRUE);
+         }
+ }
+ 
+ static gboolean
+ auto_save_is_enabled (GsmManager *manager)
+ {
+         return g_settings_get_boolean (manager->priv->settings, KEY_AUTOSAVE_ONE_SHOT)
+             || g_settings_get_boolean (manager->priv->settings, KEY_AUTOSAVE);
+ }
+ 
+ static void
+ maybe_save_session (GsmManager *manager)
+ {
+         GError *error;
+ 
+         if (gsm_system_is_login_session (manager->priv->system))
+                 return;
+ 
+         /* We only allow session saving when session is running or when
+          * logging out */
+         if (manager->priv->phase != GSM_MANAGER_PHASE_RUNNING &&
+             manager->priv->phase != GSM_MANAGER_PHASE_END_SESSION) {
+                 return;
+         }
+ 
+         if (!auto_save_is_enabled (manager)) {
+-                gsm_session_save_clear ();
+                 return;
+         }
+ 
+         error = NULL;
+         gsm_session_save (manager->priv->clients, &error);
+ 
+         if (error) {
+                 g_warning ("Error saving session: %s", error->message);
+                 g_error_free (error);
+         }
+ }
+ 
+ static void
+ _handle_client_end_session_response (GsmManager *manager,
+                                      GsmClient  *client,
+                                      gboolean    is_ok,
+                                      gboolean    do_last,
+                                      gboolean    cancel,
+                                      const char *reason)
+ {
+         /* just ignore if received outside of shutdown */
+         if (manager->priv->phase < GSM_MANAGER_PHASE_QUERY_END_SESSION) {
+                 return;
+         }
+ 
+         g_debug ("GsmManager: Response from end session request: is-ok=%d do-last=%d cancel=%d reason=%s", is_ok, do_last, cancel, reason ? reason :"");
+ 
+         if (cancel) {
+                 cancel_end_session (manager);
+                 return;
+-- 
+2.12.0
+

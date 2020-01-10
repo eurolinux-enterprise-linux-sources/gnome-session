@@ -1,0 +1,437 @@
+# Vital Khilko <dojlid@mova.org>, 2003.
+# Ihar Hrachyshka <ihar.hrachyshka@gmail.com>, 2006, 2011, 2013.
+# Alexander Nyakhaychyk <nyakhaychyk@gmail.com>, 2006, 2008, 2009.
+msgid ""
+msgstr ""
+"Project-Id-Version: gnome-session.master\n"
+"Report-Msgid-Bugs-To: http://bugzilla.gnome.org/enter_bug.cgi?product=gnome-"
+"session&keywords=I18N+L10N&component=general\n"
+"POT-Creation-Date: 2013-09-09 23:10+0000\n"
+"PO-Revision-Date: 2012-09-07 18:03+0300\n"
+"Last-Translator: Ihar Hrachyshka <ihar.hrachyshka@gmail.com>\n"
+"Language-Team: Belarusian <i18n-bel-gnome@googlegroups.com>\n"
+"Language: be\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
+"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+#: ../capplet/gsm-app-dialog.c:120
+msgid "Select Command"
+msgstr "Выбар загаду"
+
+#: ../capplet/gsm-app-dialog.c:193
+msgid "Add Startup Program"
+msgstr "Даданне праграмы аўтазапуску"
+
+#: ../capplet/gsm-app-dialog.c:197
+msgid "Edit Startup Program"
+msgstr "Рэдагаванне праграмы аўтазапуску"
+
+#: ../capplet/gsm-app-dialog.c:484
+msgid "The startup command cannot be empty"
+msgstr "Загад аўтазапуску не можа быць пустым"
+
+#: ../capplet/gsm-app-dialog.c:490
+msgid "The startup command is not valid"
+msgstr "Хібны загад аўтазапуску"
+
+#: ../capplet/gsm-properties-dialog.c:519
+msgid "Enabled"
+msgstr "Уключана"
+
+#: ../capplet/gsm-properties-dialog.c:531
+msgid "Icon"
+msgstr "Значок"
+
+#: ../capplet/gsm-properties-dialog.c:543
+msgid "Program"
+msgstr "Праграма"
+
+#: ../capplet/gsm-properties-dialog.c:747
+msgid "Startup Applications Preferences"
+msgstr "Настройкі праграм аўтазапуску"
+
+#: ../capplet/gsp-app.c:276
+msgid "No name"
+msgstr "Няма назвы"
+
+#: ../capplet/gsp-app.c:282
+msgid "No description"
+msgstr "Няма апісання"
+
+#: ../capplet/main.c:35 ../gnome-session/main.c:309
+msgid "Version of this application"
+msgstr "Версія гэтай праграмы"
+
+#: ../capplet/main.c:61
+msgid "Could not display help document"
+msgstr "Не ўдалося паказаць даведачны дакумент"
+
+#: ../data/gnome-custom-session.desktop.in.h:1
+msgid "Custom"
+msgstr "Уласны"
+
+#: ../data/gnome-custom-session.desktop.in.h:2
+msgid "This entry lets you select a saved session"
+msgstr "Гэты выбар дазваляе выбраць раней захаваны сеанс"
+
+#: ../data/gnome.desktop.in.h:1 ../data/gnome.session.desktop.in.in.h:1
+msgid "GNOME"
+msgstr "GNOME"
+
+#: ../data/gnome.desktop.in.h:2
+msgid "This session logs you into GNOME"
+msgstr "Сеанс уваходу ў GNOME"
+
+#: ../data/gnome-dummy.session.desktop.in.in.h:1
+msgid "GNOME dummy"
+msgstr "GNOME-пустышка"
+
+#: ../data/gnome-session-properties.desktop.in.in.h:1
+msgid "Startup Applications"
+msgstr "Праграмы аўтазапуску"
+
+#: ../data/gnome-session-properties.desktop.in.in.h:2
+msgid "Choose what applications to start when you log in"
+msgstr "Выбар праграмы для аўтазапуску пры ўваходзе ў сеанс"
+
+#: ../data/gnome-wayland.desktop.in.h:1
+#: ../data/gnome-wayland.session.desktop.in.in.h:1
+msgid "GNOME on Wayland"
+msgstr "GNOME на Wayland"
+
+#: ../data/gnome-wayland.desktop.in.h:2
+msgid "This session logs you into GNOME, using Wayland"
+msgstr "Гэты сеанс прызначаны для ўваходу ў GNOME з выкарыстаннем Wayland"
+
+#: ../data/session-selector.ui.h:1
+msgid "Custom Session"
+msgstr "Уласны сеанс"
+
+#: ../data/session-selector.ui.h:2 ../tools/gnome-session-selector.c:103
+msgid "Please select a custom session to run"
+msgstr "Выберыце асаблівы сеанс для запуску"
+
+#: ../data/session-selector.ui.h:3
+msgid "_New Session"
+msgstr "_Новы сеанс"
+
+#: ../data/session-selector.ui.h:4
+msgid "_Remove Session"
+msgstr "_Выдаліць сеанс"
+
+#: ../data/session-selector.ui.h:5
+msgid "Rena_me Session"
+msgstr "Пера_назваць сеанс"
+
+#: ../data/session-selector.ui.h:6
+msgid "_Continue"
+msgstr "_Працягнуць"
+
+#: ../data/session-properties.ui.h:1
+msgid "Additional startup _programs:"
+msgstr "Дадатковыя праграмы _аўтазапуску:"
+
+#: ../data/session-properties.ui.h:2
+msgid "Startup Programs"
+msgstr "Праграмы аўтазапуску"
+
+#: ../data/session-properties.ui.h:3
+msgid "_Automatically remember running applications when logging out"
+msgstr "_Аўтаматычна запамінаць дзейныя праграмы пры заканчэнні сеанса"
+
+#: ../data/session-properties.ui.h:4
+msgid "_Remember Currently Running Applications"
+msgstr "_Запамінаць дзейныя праграмы"
+
+#: ../data/session-properties.ui.h:5
+msgid "Options"
+msgstr "Опцыі"
+
+#: ../data/session-properties.ui.h:6
+msgid "Browse…"
+msgstr "Агляд..."
+
+#: ../data/session-properties.ui.h:7
+msgid "Comm_ent:"
+msgstr "_Каментарый:"
+
+#: ../data/session-properties.ui.h:8
+msgid "Co_mmand:"
+msgstr "_Загад:"
+
+#: ../data/session-properties.ui.h:9
+msgid "_Name:"
+msgstr "_Назва:"
+
+#: ../egg/eggdesktopfile.c:165
+#, c-format
+msgid "File is not a valid .desktop file"
+msgstr "Файл не з'яўляецца правільным desktop-файлам"
+
+#. translators: 'Version' is from a desktop file, and
+#. * should not be translated. '%s' would probably be a
+#. * version number.
+#: ../egg/eggdesktopfile.c:191
+#, c-format
+msgid "Unrecognized desktop file Version '%s'"
+msgstr "Невядомая версія desktop-файла \"%s\""
+
+#: ../egg/eggdesktopfile.c:974
+#, c-format
+msgid "Starting %s"
+msgstr "Запуск %s"
+
+#: ../egg/eggdesktopfile.c:1116
+#, c-format
+msgid "Application does not accept documents on command line"
+msgstr "Праграма не прымае дакументы з загаднага радка"
+
+#: ../egg/eggdesktopfile.c:1184
+#, c-format
+msgid "Unrecognized launch option: %d"
+msgstr "Невядомая опцыя запуску: %d"
+
+#. translators: The 'Type=Link' string is found in a
+#. * desktop file, and should not be translated.
+#: ../egg/eggdesktopfile.c:1391
+#, c-format
+msgid "Can't pass document URIs to a 'Type=Link' desktop entry"
+msgstr ""
+"Немагчыма перадаць URI-адрасы дакументаў desktop-элементу з \"Type=Link\""
+
+#: ../egg/eggdesktopfile.c:1412
+#, c-format
+msgid "Not a launchable item"
+msgstr "Гэта не запускальны элемент"
+
+#: ../egg/eggsmclient.c:226
+msgid "Disable connection to session manager"
+msgstr "Выключыць злучэнне з кіраўніком сеансаў"
+
+#: ../egg/eggsmclient.c:229
+msgid "Specify file containing saved configuration"
+msgstr "Вызначыць файл, які змяшчае захаваныя настройкі"
+
+#: ../egg/eggsmclient.c:229
+msgid "FILE"
+msgstr "ФАЙЛ"
+
+#: ../egg/eggsmclient.c:232
+msgid "Specify session management ID"
+msgstr "Вызначыць ідэнтыфікатар для кіравання сеансам"
+
+#: ../egg/eggsmclient.c:232
+msgid "ID"
+msgstr "ID"
+
+#: ../egg/eggsmclient.c:253
+msgid "Session management options:"
+msgstr "Опцыі для кіравання сеансам:"
+
+#: ../egg/eggsmclient.c:254
+msgid "Show session management options"
+msgstr "Паказаць опцыі для кіравання сеансам"
+
+#: ../gnome-session/gsm-fail-whale-dialog.c:295
+msgid "Oh no!  Something has gone wrong."
+msgstr "Нешта пайшло не так, як мае быць!"
+
+#: ../gnome-session/gsm-fail-whale-dialog.c:302
+msgid ""
+"A problem has occurred and the system can't recover. Please contact a system "
+"administrator"
+msgstr ""
+"Узнікла праблема, пасля якой сістэма не здолела ўзнавіць працу. Звярніцеся "
+"да вашага сістэмнага адміністратара."
+
+#: ../gnome-session/gsm-fail-whale-dialog.c:304
+msgid ""
+"A problem has occurred and the system can't recover. All extensions have "
+"been disabled as a precaution."
+msgstr ""
+"Узнікла праблема, пасля якой сістэма не здолела ўзнавіць працу. Для пэўнасці "
+"ўсе пашырэнні былі выключаны."
+
+#: ../gnome-session/gsm-fail-whale-dialog.c:306
+msgid ""
+"A problem has occurred and the system can't recover.\n"
+"Please log out and try again."
+msgstr ""
+"Узнікла праблема, пасля якой сістэма не здолела ўзнавіць працу.\n"
+"Выйдзіце з сеанса і паўтарыце спробу."
+
+#: ../gnome-session/gsm-fail-whale-dialog.c:321
+msgid "_Log Out"
+msgstr "_Выйсці"
+
+#: ../gnome-session/gsm-fail-whale-dialog.c:343 ../gnome-session/main.c:307
+msgid "Enable debugging code"
+msgstr "Уключыць адладачны код"
+
+#: ../gnome-session/gsm-fail-whale-dialog.c:344
+msgid "Allow logout"
+msgstr "Дазволіць выхад з сеанса"
+
+#: ../gnome-session/gsm-fail-whale-dialog.c:345
+msgid "Show extension warning"
+msgstr "Паказаць перасцярогі ад пашырэння"
+
+#: ../gnome-session/gsm-manager.c:1271 ../gnome-session/gsm-manager.c:2043
+msgid "Not responding"
+msgstr "Не адказвае"
+
+#: ../gnome-session/gsm-util.c:411
+msgid "_Log out"
+msgstr "_Выйсці з сеанса"
+
+#. It'd be really surprising to reach this code: if we're here,
+#. * then the XSMP client already has set several XSMP
+#. * properties. But it could still be that SmProgram is not set.
+#.
+#: ../gnome-session/gsm-xsmp-client.c:559
+msgid "Remembered Application"
+msgstr "Запомненыя праграмы"
+
+#: ../gnome-session/gsm-xsmp-client.c:1209
+msgid "This program is blocking logout."
+msgstr "Гэта праграма замінае выхаду з сеанса"
+
+#: ../gnome-session/gsm-xsmp-server.c:341
+msgid ""
+"Refusing new client connection because the session is currently being shut "
+"down\n"
+msgstr "Адмова ў новым кліенцкім злучэнні, бо сеанс ужо канчаецца\n"
+
+#: ../gnome-session/gsm-xsmp-server.c:610
+#, c-format
+msgid "Could not create ICE listening socket: %s"
+msgstr "Не ўдалося стварыць ICE-сокет праслухоўвання: %s"
+
+#: ../gnome-session/main.c:305
+msgid "Override standard autostart directories"
+msgstr "Засланіць звычайныя каталогі аўтазапуску"
+
+#: ../gnome-session/main.c:305
+msgid "AUTOSTART_DIR"
+msgstr "КАТАЛОГ_АЎТАЗАПУСКУ"
+
+#: ../gnome-session/main.c:306
+msgid "Session to use"
+msgstr "Патрэбны сеанс"
+
+#: ../gnome-session/main.c:306
+msgid "SESSION_NAME"
+msgstr "НАЗВА_СЕАНСА"
+
+#: ../gnome-session/main.c:308
+msgid "Do not load user-specified applications"
+msgstr "Не запускаць праграм, вызначаных карыстальнікам"
+
+#. Translators: the 'fail whale' is the black dialog we show when something goes seriously wrong
+#: ../gnome-session/main.c:311
+msgid "Show the fail whale dialog for testing"
+msgstr "Паказаць аварыйнае дыялогавае акенца"
+
+#: ../gnome-session/main.c:344
+msgid " - the GNOME session manager"
+msgstr " - кіраўнік сеансаў GNOME"
+
+#: ../tools/gnome-session-inhibit.c:110
+#, c-format
+msgid ""
+"%s [OPTION...] COMMAND\n"
+"\n"
+"Execute COMMAND while inhibiting some session functionality.\n"
+"\n"
+"  -h, --help        Show this help\n"
+"  --version         Show program version\n"
+"  --app-id ID       The application id to use\n"
+"                    when inhibiting (optional)\n"
+"  --reason REASON   The reason for inhibiting (optional)\n"
+"  --inhibit ARG     Things to inhibit, colon-separated list of:\n"
+"                    logout, switch-user, suspend, idle, automount\n"
+"  --inhibit-only    Do not launch COMMAND and wait forever instead\n"
+"\n"
+"If no --inhibit option is specified, idle is assumed.\n"
+msgstr ""
+"%s [ОПЦЫЯ...] ЗАГАД\n"
+"\n"
+"Выконвае ЗАГАД, стрымліваючы некаторыя функцыі сеанса.\n"
+"\n"
+"  -h, --help        Паказаць гэту даведку\n"
+"  --version         Паказаць нумар версіі праграмы\n"
+"  --app-id ID       Ідэнтыфікатар праграмы падчас\n"
+"                    стрымлівання сеанса (неабавязковая опцыя)\n"
+"  --reason ПРЫЧЫНА  Прычына стрымання (неабавязковая опцыя)\n"
+"  --inhibit АРГ     Спіс дзеянняў для стрымлівання, падзеленых двукроп'ямі:\n"
+"                    logout, switch-user, suspend, idle, automount\n"
+"  --inhibit-only    Не запускаць ЗАГАД, а бясконца чакаць\n"
+"\n"
+"Калі не ўжыта опцыя --inhibit, выкарыстоўваецца idle.\n"
+
+#: ../tools/gnome-session-inhibit.c:148
+#, c-format
+msgid "Failed to execute %s\n"
+msgstr "Не ўдалося выканаць %s\n"
+
+#: ../tools/gnome-session-inhibit.c:208 ../tools/gnome-session-inhibit.c:218
+#: ../tools/gnome-session-inhibit.c:228
+#, c-format
+msgid "%s requires an argument\n"
+msgstr "%s патрабуе аргумент\n"
+
+#: ../tools/gnome-session-selector.c:62
+#, c-format
+msgid "Session %d"
+msgstr "Сеанс %d"
+
+#: ../tools/gnome-session-selector.c:108
+msgid ""
+"Session names are not allowed to start with ‘.’ or contain ‘/’ characters"
+msgstr ""
+"Назвы сеансаў не могуць пачынацца з кропкі (.) і змяшчаць знак скосу (/)"
+
+#: ../tools/gnome-session-selector.c:112
+msgid "Session names are not allowed to start with ‘.’"
+msgstr "Назвы сеансаў не могуць пачынацца з кропкі (.)"
+
+#: ../tools/gnome-session-selector.c:116
+msgid "Session names are not allowed to contain ‘/’ characters"
+msgstr "Назвы сеансаў не могуць змяшчаць знак скосу (/)"
+
+#: ../tools/gnome-session-selector.c:124
+#, c-format
+msgid "A session named ‘%s’ already exists"
+msgstr "Сеанс з назвай \"%s\" ужо існуе"
+
+#: ../tools/gnome-session-quit.c:53
+msgid "Log out"
+msgstr "Выйсці з сеанса"
+
+#: ../tools/gnome-session-quit.c:54
+msgid "Power off"
+msgstr "Выключыць камп'ютар"
+
+#: ../tools/gnome-session-quit.c:55
+msgid "Reboot"
+msgstr "Перазагрузіць"
+
+#: ../tools/gnome-session-quit.c:56
+msgid "Ignoring any existing inhibitors"
+msgstr "Ігнараваць усіх наяўных блакіроўшчыкаў"
+
+#: ../tools/gnome-session-quit.c:57
+msgid "Don't prompt for user confirmation"
+msgstr "Не прасіць пацвярджэння ад карыстальніка"
+
+#: ../tools/gnome-session-quit.c:91 ../tools/gnome-session-quit.c:101
+msgid "Could not connect to the session manager"
+msgstr "Не ўдалося злучыцца з кіраўніком сеансаў"
+
+#: ../tools/gnome-session-quit.c:203
+msgid "Program called with conflicting options"
+msgstr "Праграма запушчана з несумяшчальнымі опцыямі"
+

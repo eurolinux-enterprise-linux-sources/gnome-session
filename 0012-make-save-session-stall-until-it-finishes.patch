@@ -1,0 +1,428 @@
+From 92c8574d86c70e8a595dfbfdab461c7b990d2fe1 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Fri, 20 Dec 2013 11:32:52 -0500
+Subject: [PATCH 12/19] make save-session stall until it finishes
+
+---
+ gnome-session/gsm-manager.c                | 58 ++++++++++++++++++++++++++----
+ gnome-session/gsm-manager.h                |  2 +-
+ gnome-session/org.gnome.SessionManager.xml |  1 +
+ 3 files changed, 53 insertions(+), 8 deletions(-)
+
+diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
+index 711961d6..3c6bb7f4 100644
+--- a/gnome-session/gsm-manager.c
++++ b/gnome-session/gsm-manager.c
+@@ -113,60 +113,61 @@ typedef enum
+         GSM_MANAGER_LOGOUT_REBOOT_INTERACT,
+         GSM_MANAGER_LOGOUT_SHUTDOWN,
+         GSM_MANAGER_LOGOUT_SHUTDOWN_INTERACT,
+ } GsmManagerLogoutType;
+ 
+ struct GsmManagerPrivate
+ {
+         gboolean                failsafe;
+         GsmStore               *clients;
+         GsmStore               *inhibitors;
+         GsmInhibitorFlag        inhibited_actions;
+         GsmStore               *apps;
+         GsmPresence            *presence;
+         GsmXsmpServer          *xsmp_server;
+ 
+         char                   *session_name;
+         gboolean                is_fallback_session : 1;
+ 
+         /* Current status */
+         GsmManagerPhase         phase;
+         guint                   phase_timeout_id;
+         GSList                 *required_apps;
+         GSList                 *pending_apps;
+         GsmManagerLogoutMode    logout_mode;
+         GSList                 *query_clients;
+         guint                   query_timeout_id;
+         /* This is used for GSM_MANAGER_PHASE_END_SESSION only at the moment,
+          * since it uses a sublist of all running client that replied in a
+          * specific way */
+         GSList                 *next_query_clients;
++        GSList                 *pending_save_invocations;
+         /* This is the action that will be done just before we exit */
+         GsmManagerLogoutType    logout_type;
+ 
+         /* List of clients which were disconnected due to disabled condition
+          * and shouldn't be automatically restarted */
+         GSList                 *condition_clients;
+ 
+         GSList                 *pending_end_session_tasks;
+         GCancellable           *end_session_cancellable;
+ 
+         GSettings              *settings;
+         GSettings              *session_settings;
+         GSettings              *screensaver_settings;
+         GSettings              *lockdown_settings;
+ 
+         GsmSystem              *system;
+         GDBusConnection        *connection;
+         GsmExportedManager     *skeleton;
+         gboolean                dbus_disconnected : 1;
+ 
+         GsmShell               *shell;
+         guint                   shell_end_session_dialog_canceled_id;
+         guint                   shell_end_session_dialog_open_failed_id;
+         guint                   shell_end_session_dialog_confirmed_logout_id;
+         guint                   shell_end_session_dialog_confirmed_shutdown_id;
+         guint                   shell_end_session_dialog_confirmed_reboot_id;
+ };
+ 
+ enum {
+         PROP_0,
+@@ -1165,90 +1166,124 @@ query_end_session_complete (GsmManager *manager)
+ static gboolean
+ _client_request_save (GsmClient            *client,
+                       ClientEndSessionData *data)
+ {
+         gboolean ret;
+         GError  *error;
+ 
+         error = NULL;
+         ret = gsm_client_request_save (client, data->flags, &error);
+         if (ret) {
+                 g_debug ("GsmManager: adding client to query clients: %s", gsm_client_peek_id (client));
+                 data->manager->priv->query_clients = g_slist_prepend (data->manager->priv->query_clients,
+                                                                       client);
+         } else if (error) {
+                 g_debug ("GsmManager: unable to query client: %s", error->message);
+                 g_error_free (error);
+         }
+ 
+         return FALSE;
+ }
+ 
+ static gboolean
+ _client_request_save_helper (const char           *id,
+                              GsmClient            *client,
+                              ClientEndSessionData *data)
+ {
+         return _client_request_save (client, data);
+ }
+ 
+ static void
++fail_pending_save_invocations (GsmManager *manager,
++                               GError     *error)
++{
++        GSList *l;
++
++        for (l = manager->priv->pending_save_invocations; l != NULL; l = l->next) {
++                DBusGMethodInvocation *context = l->data;
++
++                dbus_g_method_return_error (context, error);
++        }
++
++        g_slist_free (manager->priv->pending_save_invocations);
++        manager->priv->pending_save_invocations = NULL;
++}
++
++static void
++finish_pending_save_invocations (GsmManager *manager)
++{
++        GSList *l;
++
++        for (l = manager->priv->pending_save_invocations; l != NULL; l = l->next) {
++                DBusGMethodInvocation *context = l->data;
++
++                dbus_g_method_return (context);
++        }
++
++        g_slist_free (manager->priv->pending_save_invocations);
++        manager->priv->pending_save_invocations = NULL;
++}
++
++static void
+ query_save_session_complete (GsmManager *manager)
+ {
+         GError *error = NULL;
+ 
+         if (g_slist_length (manager->priv->next_query_clients) > 0) {
+                 ClientEndSessionData data;
+ 
+                 data.manager = manager;
+                 data.flags = GSM_CLIENT_END_SESSION_FLAG_LAST;
+ 
+                 g_slist_foreach (manager->priv->next_query_clients,
+                                  (GFunc)_client_request_save,
+                                  &data);
+ 
+                 g_slist_free (manager->priv->next_query_clients);
+                 manager->priv->next_query_clients = NULL;
+ 
+                 return;
+         }
+ 
+         if (manager->priv->query_timeout_id > 0) {
+                 g_source_remove (manager->priv->query_timeout_id);
+                 manager->priv->query_timeout_id = 0;
+         }
+ 
+         gsm_session_save (manager->priv->clients, &error);
+ 
+         if (error) {
+                 g_warning ("Error saving session: %s", error->message);
++                fail_pending_save_invocations (manager, error);
+                 g_error_free (error);
++        } else {
++                finish_pending_save_invocations (manager);
+         }
+ }
+ 
+ static guint32
+ generate_cookie (void)
+ {
+         guint32 cookie;
+ 
+         cookie = (guint32)g_random_int_range (1, G_MAXINT32);
+ 
+         return cookie;
+ }
+ 
+ static guint32
+ _generate_unique_cookie (GsmManager *manager)
+ {
+         guint32 cookie;
+ 
+         do {
+                 cookie = generate_cookie ();
+         } while (gsm_store_find (manager->priv->inhibitors, (GsmStoreFunc)_find_by_cookie, &cookie) != NULL);
+ 
+         return cookie;
+ }
+ 
+ static gboolean
+ _on_query_end_session_timeout (GsmManager *manager)
+ {
+         GSList *l;
+ 
+@@ -2699,92 +2734,101 @@ gsm_manager_initialization_error (GsmExportedManager    *skeleton,
+                                   GsmManager            *manager)
+ {
+         if (manager->priv->phase != GSM_MANAGER_PHASE_INITIALIZATION) {
+                 g_dbus_method_invocation_return_error (invocation,
+                                                        GSM_MANAGER_ERROR,
+                                                        GSM_MANAGER_ERROR_NOT_IN_INITIALIZATION,
+                                                        "InitializationError interface is only available during the Initialization phase");
+                 return TRUE;
+         }
+ 
+         gsm_util_init_error (fatal, "%s", message);
+         gsm_exported_manager_complete_initialization_error (skeleton, invocation);
+ 
+         return TRUE;
+ }
+ 
+ static void
+ user_logout (GsmManager           *manager,
+              GsmManagerLogoutMode  mode)
+ {
+         if (manager->priv->phase >= GSM_MANAGER_PHASE_QUERY_END_SESSION) {
+                 manager->priv->logout_mode = mode;
+                 end_session_or_show_shell_dialog (manager);
+                 return;
+         }
+ 
+         request_logout (manager, mode);
+ }
+ 
+ gboolean
+-gsm_manager_save_session (GsmManager *manager,
+-                          GError     **error)
++gsm_manager_save_session (GsmManager            *manager,
++                          DBusGMethodInvocation *context)
+ {
+         ClientEndSessionData data;
++        GError *error;
+ 
+         g_debug ("GsmManager: SaveSession called");
+ 
+         g_return_val_if_fail (GSM_IS_MANAGER (manager), FALSE);
+ 
+         if (manager->priv->phase != GSM_MANAGER_PHASE_RUNNING) {
+-                g_set_error (error,
+-                             GSM_MANAGER_ERROR,
+-                             GSM_MANAGER_ERROR_NOT_IN_RUNNING,
+-                             "SaveSession interface is only available during the Running phase");
++                error = g_error_new (GSM_MANAGER_ERROR,
++                                     GSM_MANAGER_ERROR_NOT_IN_RUNNING,
++                                     "SaveSession interface is only available during the Running phase");
++                dbus_g_method_return_error (context, error);
++                g_error_free (error);
+                 return FALSE;
+         }
+ 
+         data.manager = manager;
+         data.flags = 0;
+         gsm_store_foreach (manager->priv->clients,
+                            (GsmStoreFunc)_client_request_save_helper,
+                            &data);
+ 
+         if (manager->priv->query_clients) {
+                 manager->priv->query_timeout_id = g_timeout_add_seconds (GSM_MANAGER_SAVE_SESSION_TIMEOUT,
+                                                                          (GSourceFunc)_on_query_save_session_timeout,
+                                                                          manager);
++
++                manager->priv->pending_save_invocations = g_slist_prepend (manager->priv->pending_save_invocations,
++                                                                           context);
++
+                 return TRUE;
+         } else {
+                 g_debug ("GsmManager: Nothing to save");
+-                return FALSE;
++                dbus_g_method_return (context);
++                return TRUE;
+         }
++
++        return TRUE;
+ }
+ 
+ gboolean
+ gsm_manager_logout (GsmManager *manager,
+                     guint logout_mode,
+                     GError **error)
+ {
+         if (manager->priv->phase < GSM_MANAGER_PHASE_RUNNING) {
+                 g_set_error (error,
+                              GSM_MANAGER_ERROR,
+                              GSM_MANAGER_ERROR_NOT_IN_RUNNING,
+                              "Logout interface is only available after the Running phase starts");
+                 return FALSE;
+         }
+ 
+         if (_log_out_is_locked_down (manager)) {
+                 g_set_error (error,
+                              GSM_MANAGER_ERROR,
+                              GSM_MANAGER_ERROR_LOCKED_DOWN,
+                              "Logout has been locked down");
+                 return FALSE;
+         }
+ 
+         switch (logout_mode) {
+         case GSM_MANAGER_LOGOUT_MODE_NORMAL:
+         case GSM_MANAGER_LOGOUT_MODE_NO_CONFIRMATION:
+         case GSM_MANAGER_LOGOUT_MODE_FORCE:
+                 user_logout (manager, logout_mode);
+                 break;
+ 
+diff --git a/gnome-session/gsm-manager.h b/gnome-session/gsm-manager.h
+index 4d14aa34..a8de58de 100644
+--- a/gnome-session/gsm-manager.h
++++ b/gnome-session/gsm-manager.h
+@@ -97,42 +97,42 @@ GType               gsm_manager_get_type                       (void);
+ 
+ GsmManager *        gsm_manager_new                            (GsmStore       *client_store,
+                                                                 gboolean        failsafe);
+ GsmManager *        gsm_manager_get                            (void);
+ 
+ gboolean            gsm_manager_get_failsafe                   (GsmManager     *manager);
+ 
+ gboolean            gsm_manager_add_autostart_app              (GsmManager     *manager,
+                                                                 const char     *path,
+                                                                 const char     *provides);
+ gboolean            gsm_manager_add_required_app               (GsmManager     *manager,
+                                                                 const char     *path,
+                                                                 const char     *provides);
+ gboolean            gsm_manager_add_autostart_apps_from_dir    (GsmManager     *manager,
+                                                                 const char     *path);
+ gboolean            gsm_manager_add_legacy_session_apps        (GsmManager     *manager,
+                                                                 const char     *path);
+ 
+ void                gsm_manager_start                          (GsmManager     *manager);
+ 
+ const char *        _gsm_manager_get_default_session           (GsmManager     *manager);
+ 
+ void                _gsm_manager_set_active_session            (GsmManager     *manager,
+                                                                 const char     *session_name,
+                                                                 gboolean        is_fallback);
+ 
+ void                _gsm_manager_set_renderer                  (GsmManager     *manager,
+                                                                 const char     *renderer);
+ 
+ gboolean            gsm_manager_save_session                   (GsmManager     *manager,
+-                                                                GError        **error);
++								DBusGMethodInvocation *context);
+ 
+ gboolean            gsm_manager_logout                         (GsmManager     *manager,
+                                                                 guint           logout_mode,
+                                                                 GError        **error);
+ 
+ gboolean            gsm_manager_set_phase                      (GsmManager     *manager,
+                                                                 GsmManagerPhase phase);
+ 
+ G_END_DECLS
+ 
+ #endif /* __GSM_MANAGER_H */
+diff --git a/gnome-session/org.gnome.SessionManager.xml b/gnome-session/org.gnome.SessionManager.xml
+index 29eb0990..ac73adc9 100644
+--- a/gnome-session/org.gnome.SessionManager.xml
++++ b/gnome-session/org.gnome.SessionManager.xml
+@@ -256,60 +256,61 @@
+       <arg name="handled" direction="out" type="b">
+         <doc:doc>
+           <doc:summary>True if condition is handled, false otherwise</doc:summary>
+         </doc:doc>
+       </arg>
+       <doc:doc>
+         <doc:description>
+           <doc:para>Allows the caller to determine whether the session manager is
+           handling changes to the specified autostart condition.</doc:para>
+         </doc:description>
+       </doc:doc>
+     </method>
+ 
+     <method name="Shutdown">
+       <doc:doc>
+         <doc:description>
+           <doc:para>Request a shutdown dialog.</doc:para>
+         </doc:description>
+       </doc:doc>
+     </method>
+ 
+     <method name="Reboot">
+       <doc:doc>
+         <doc:description>
+           <doc:para>Request a reboot dialog.</doc:para>
+         </doc:description>
+       </doc:doc>
+     </method>
+ 
+     <method name="SaveSession">
++      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+       <doc:doc>
+ 	<doc:description>
+ 	  <doc:para>Request to save session</doc:para>
+ 	</doc:description>
+       </doc:doc>
+     </method>
+ 
+     <method name="CanShutdown">
+       <arg name="is_available" direction="out" type="b">
+         <doc:doc>
+           <doc:summary>True if shutdown is available to the user, false otherwise</doc:summary>
+         </doc:doc>
+       </arg>
+       <doc:doc>
+         <doc:description>
+           <doc:para>Allows the caller to determine whether or not it's okay to show
+           a shutdown option in the UI</doc:para>
+         </doc:description>
+       </doc:doc>
+     </method>
+ 
+     <method name="Logout">
+       <arg name="mode" type="u" direction="in">
+         <doc:doc>
+           <doc:summary>The type of logout that is being requested</doc:summary>
+         </doc:doc>
+       </arg>
+       <doc:doc>
+         <doc:description>
+           <doc:para>Request a logout dialog</doc:para>
+-- 
+2.12.0
+

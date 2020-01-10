@@ -1,0 +1,56 @@
+From 69c18aa6324e7d3fd6f93ea7a79ce99bed1a452d Mon Sep 17 00:00:00 2001
+From: Adam Jackson <ajax@redhat.com>
+Date: Fri, 8 May 2015 16:46:47 -0400
+Subject: [PATCH] Allow running on the classic software renderer
+
+No effect on arches where we build llvmpipe,
+but on ppc/s390 classic swrast is marginally
+less painful than softpipe.
+---
+ data/hardware-compatibility | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/data/hardware-compatibility b/data/hardware-compatibility
+index 3daef68..fd06230 100644
+--- a/data/hardware-compatibility
++++ b/data/hardware-compatibility
+@@ -1,35 +1,35 @@
+ ##
+ ## This file contains a list of blacklist/whitelist regular expressions for
+ ## renderer strings.
+ ##
+ ## The regular expressions are case-insensitive POSIX Extended Regular
+ ## Expressions. See regex(7) for details.
+ ##
+ ## Syntax:
+ ##  - Comment lines start with '#'
+ ##  - Lines starting with '+' are whitelisting.
+ ##  - Lines starting with '-' are blacklisting.
+ ##  - Lines not starting with '#', '+', '-' are ignored.
+ ##
+ 
+ # Intel 830-865
+ -Intel\(R\) 8[[:digit:]]{2,2}[^[:digit:]]
+ 
+ # Intel IGD 
+ -Intel IGD
+ 
+ # Pre-R300 radeon
+ -Mesa DRI R[12]00[^[:digit:]]
+ -Mesa DRI R[12]00$
+ 
+ # NV30 family on Nouveau: https://bugzilla.redhat.com/show_bug.cgi?id=745202
+ -Gallium .* on NV3[0-9A-F]$
+ 
+ # Old Mesa software GL renderer
+--software rasterizer
++#software rasterizer
+ 
+ # Gallium has softpipe; we explicitly enable llvmpipe
+ -softpipe
+ 
+ # nouveau vieux NV25 doesn't work too well
+ -Mesa DRI nv25
+-- 
+2.3.7
+
