@@ -6,7 +6,7 @@
 
 Name: gnome-session
 Version: 3.28.1
-Release: 6%{?dist}
+Release: 7%{?dist}
 Summary: GNOME session manager
 
 License: GPLv2+
@@ -48,6 +48,8 @@ Patch31: 0002-autostart-ensure-gnome-shell-and-mutter-get-right-au.patch
 Patch40: 0001-main-don-t-call-into-gdbus-before-setting-all-enviro.patch
 
 Patch50: fix-crash-on-no-dispay.patch
+
+Patch6001: 0001-gsm-util-avoid-groups-in-regexex.patch
 
 BuildRequires: meson
 BuildRequires: gcc
@@ -192,6 +194,10 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 %{_datadir}/glib-2.0/schemas/org.gnome.SessionManager.gschema.xml
 
 %changelog
+* Tue Mar 26 2019 Ray Strode <rstrode@redhat.com> - 3.28.1-7
+- Be more gentle on PCRE, to avoid crash
+  Resolves: #1644663
+
 * Tue Oct 02 2018 Ray Strode <rstrode@redhat.com> - 3.28.1-6
 - Fix crash in gles helper if there's no display
   Resolves: #1627056
